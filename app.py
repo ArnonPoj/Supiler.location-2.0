@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, jsonify
 import sqlite3
 import os
 from openlocationcode import openlocationcode as olc
@@ -15,7 +15,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             lat REAL NOT NULL,
             lon REAL NOT NULL,
-            title TEXT
+            title TEXT NOT NULL
         )
     ''')
     conn.commit()
@@ -35,6 +35,15 @@ def add_marker(lat, lon, title):
     c.execute("INSERT INTO markers (lat, lon, title) VALUES (?, ?, ?)", (lat, lon, title))
     conn.commit()
     conn.close()
+
+def decode_olc(code, ref_lat=13.7563, ref_lon=100.5018):
+    plus_code = code.split()[0].strip()
+    if not olc.isFull(plus_code):
+        recovered = olc.recoverNearest(plus_code, ref_lat, ref_lon)
+        decoded = olc.decode(recovered)
+    else:
+        decoded = olc.decode(plus_code)
+    return decoded.latitudeCenter, decoded.longitudeCenter
 
 @app.route('/')
 def index():
@@ -56,14 +65,7 @@ def add_marker_api():
 
     if olc_code:
         try:
-            if not olc.isFull(olc_code):
-                ref_lat, ref_lon = 13.7563, 100.5018
-                recovered = olc.recoverNearest(olc_code, ref_lat, ref_lon)
-                decoded = olc.decode(recovered)
-            else:
-                decoded = olc.decode(olc_code)
-            lat = decoded.latitudeCenter
-            lon = decoded.longitudeCenter
+            lat, lon = decode_olc(olc_code)
         except Exception as e:
             return {"error": f"OLC ไม่ถูกต้อง: {str(e)}"}, 400
     else:
