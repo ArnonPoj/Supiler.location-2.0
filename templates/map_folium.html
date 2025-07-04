@@ -2,30 +2,75 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8" />
-    <title>แผนที่หมุด</title>
+    <title>แผนที่หมุด + คลิกเพิ่มจุด + OLC</title>
+    <style>
+        #mapid { height: 600px; margin-top: 10px; }
+    </style>
+
+    <!-- โหลด Leaflet CSS/JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+
+    <!-- โหลด Open Location Code JS ไลบรารี -->
+    <script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.min.js"></script>
 </head>
 <body>
     <h2>📍 เพิ่มหมุดใหม่</h2>
 
     <form method="POST" style="margin-bottom: 10px;">
         <input type="text" name="name" placeholder="ชื่อสถานที่" required />
-        <input type="text" name="olc" placeholder="OLC (คัดลอกจาก Google Maps)" />
-        <input type="number" step="any" name="lat" placeholder="ละติจูด" />
-        <input type="number" step="any" name="lng" placeholder="ลองจิจูด" />
+        <input type="text" name="olc" id="olc" placeholder="OLC (คัดลอกจาก Google Maps)" />
+        <input type="number" step="any" name="lat" id="lat" placeholder="ละติจูด" />
+        <input type="number" step="any" name="lng" id="lng" placeholder="ลองจิจูด" />
         <button type="submit">เพิ่มหมุด</button>
     </form>
 
     <p style="font-size: 0.9em; color: gray;">
-        💡 คุณสามารถใส่ OLC เช่น <code>27FP+8JH, Sai Noi</code> หรือกรอกพิกัดเองก็ได้
+        💡 คุณสามารถใส่ OLC เช่น <code>27FP+8JH, Sai Noi</code> หรือกรอกพิกัดเองก็ได้<br />
+        หรือคลิกบนแผนที่เพื่อเติมพิกัดและ OLC อัตโนมัติ
     </p>
 
     <hr />
 
-    <iframe
-        src="{{ url_for('static', filename='map.html') }}"
-        width="100%"
-        height="600"
-        style="border: none;"
-    ></iframe>
+    <div id="mapid"></div>
+
+    <script>
+        // สร้างแผนที่ที่กรุงเทพฯ
+        var map = L.map('mapid').setView([13.7563, 100.5018], 12);
+
+        // โหลดแผนที่จาก OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        // เก็บ marker ที่คลิกล่าสุด
+        var marker = null;
+
+        // ฟังก์ชันเมื่อคลิกบนแผนที่
+        function onMapClick(e) {
+            var lat = e.latlng.lat;
+            var lng = e.latlng.lng;
+
+            if (marker) {
+                marker.setLatLng(e.latlng);
+            } else {
+                marker = L.marker(e.latlng).addTo(map);
+            }
+
+            // เติมค่า lat/lng ลงช่องฟอร์ม
+            document.getElementById('lat').value = lat.toFixed(6);
+            document.getElementById('lng').value = lng.toFixed(6);
+
+            // แปลงพิกัดเป็น OLC แล้วเติมช่อง olc
+            var plusCode = OpenLocationCode.encode(lat, lng);
+            document.getElementById('olc').value = plusCode;
+        }
+
+        map.on('click', onMapClick);
+
+        // TODO: ถ้าต้องการโหลดหมุดจาก backend มาปักบนแผนที่
+        // (สามารถแก้ไขเพิ่มเติมในส่วนนี้ได้)
+    </script>
 </body>
 </html>
