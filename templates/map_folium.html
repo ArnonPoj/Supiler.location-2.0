@@ -4,26 +4,56 @@
 <meta charset="UTF-8" />
 <title>แผนที่ปักหมุด 2 แบบ</title>
 <style>
-  #mapid { height: 600px; margin-top: 10px; }
+  body, html {
+    height: 100%;
+    margin: 0; padding: 0;
+    font-family: Arial, sans-serif;
+  }
+  #container {
+    display: flex;
+    height: 100vh;
+  }
+  #sidebar {
+    width: 300px;
+    padding: 15px;
+    box-sizing: border-box;
+    background: #f7f7f7;
+    border-right: 1px solid #ccc;
+    overflow-y: auto;
+  }
+  #mapid {
+    flex-grow: 1;
+  }
+  input, button {
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 8px;
+    font-size: 14px;
+  }
 </style>
+<!-- Leaflet CSS/JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+<!-- Open Location Code JS -->
 <script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.min.js"></script>
 </head>
 <body>
 
-<h2>เพิ่มหมุดด้วยฟอร์ม (กรอกชื่อ + OLC หรือ lat/lng)</h2>
-<form id="formAddMarker">
-  <input type="text" name="name" id="name" placeholder="ชื่อสถานที่" required />
-  <input type="text" name="olc" id="olc" placeholder="OLC (เช่น 27FP+8JH, Sai Noi)" />
-  <input type="number" step="any" name="lat" id="lat" placeholder="ละติจูด" />
-  <input type="number" step="any" name="lng" id="lng" placeholder="ลองจิจูด" />
-  <button type="submit">เพิ่มหมุด</button>
-</form>
+<div id="container">
+  <div id="sidebar">
+    <h2>เพิ่มหมุดด้วยฟอร์ม</h2>
+    <form id="formAddMarker">
+      <input type="text" name="name" id="name" placeholder="ชื่อสถานที่" required />
+      <input type="text" name="olc" id="olc" placeholder="OLC (เช่น 27FP+8JH, Sai Noi)" />
+      <input type="number" step="any" name="lat" id="lat" placeholder="ละติจูด" />
+      <input type="number" step="any" name="lng" id="lng" placeholder="ลองจิจูด" />
+      <button type="submit">เพิ่มหมุด</button>
+    </form>
+    <p>หรือคลิกบนแผนที่เพื่อเพิ่มหมุด (จะมี popup ให้กรอกชื่อ)</p>
+  </div>
 
-<p>หรือคลิกบนแผนที่เพื่อเพิ่มหมุด (จะมี popup ให้กรอกชื่อ)</p>
-
-<div id="mapid"></div>
+  <div id="mapid"></div>
+</div>
 
 <script>
   var map = L.map('mapid').setView([13.7563, 100.5018], 12);
@@ -32,6 +62,7 @@
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
+  // โหลดหมุดจาก backend แล้วปัก
   function loadMarkers() {
     fetch('/markers').then(r => r.json()).then(data => {
       data.forEach(m => {
@@ -41,6 +72,7 @@
   }
   loadMarkers();
 
+  // ส่งข้อมูลเพิ่มหมุดจากฟอร์ม sidebar
   document.getElementById('formAddMarker').onsubmit = async function(e) {
     e.preventDefault();
     const name = document.getElementById('name').value.trim();
@@ -59,6 +91,7 @@
     const result = await res.json();
     if(res.ok) {
       alert('เพิ่มหมุดสำเร็จ');
+      // ลบหมุดเก่าทั้งหมด
       map.eachLayer(layer => {
         if(layer instanceof L.Marker) map.removeLayer(layer);
       });
@@ -69,6 +102,7 @@
     }
   };
 
+  // คลิกแผนที่เพื่อปักหมุดและกรอกชื่อใน popup
   var tempMarker;
   function onMapClick(e) {
     if(tempMarker) map.removeLayer(tempMarker);
@@ -106,6 +140,7 @@
       alert('เพิ่มหมุดสำเร็จ');
       map.removeLayer(tempMarker);
       tempMarker = null;
+      // โหลดหมุดใหม่ทั้งหมด
       map.eachLayer(layer => {
         if(layer instanceof L.Marker) map.removeLayer(layer);
       });
