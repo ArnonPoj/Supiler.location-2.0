@@ -68,15 +68,25 @@ def index():
         title = request.form.get('name')
         lat = request.form.get('lat')
         lon = request.form.get('lng')
+        olc_code = request.form.get('olc')  # ✅ รับรหัส OLC จากฟอร์ม
 
-        if not lat or not lon or not title:
-            return "กรุณากรอกข้อมูลให้ครบ", 400
-
-        try:
-            lat = float(lat)
-            lon = float(lon)
-        except ValueError:
-            return "ละติจูดและลองจิจูดต้องเป็นตัวเลข", 400
+        # ✅ ถ้ามี OLC → แปลงเป็นพิกัด
+        if olc_code:
+            try:
+                decoded = olc.decode(olc_code)
+                lat = decoded.latitudeCenter
+                lon = decoded.longitudeCenter
+            except:
+                return "OLC ไม่ถูกต้อง", 400
+        else:
+            # ✅ ถ้าไม่มี OLC → ต้องกรอก lat/lng
+            if not lat or not lon or not title:
+                return "กรุณากรอกข้อมูลให้ครบ", 400
+            try:
+                lat = float(lat)
+                lon = float(lon)
+            except ValueError:
+                return "ละติจูดและลองจิจูดต้องเป็นตัวเลข", 400
 
         add_marker(lat, lon, title)
         create_map()
