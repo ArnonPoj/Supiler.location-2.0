@@ -1,14 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 import sqlite3
-import folium
 import os
-
 from openlocationcode import openlocationcode as olc
 
 app = Flask(__name__)
 
 DB_PATH = 'markers.db'
-MAP_HTML_PATH = 'static/map.html'
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -18,8 +15,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             lat REAL NOT NULL,
             lon REAL NOT NULL,
-            title TEXT,
-            description TEXT
+            title TEXT
         )
     ''')
     conn.commit()
@@ -28,74 +24,60 @@ def init_db():
 def get_all_markers():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT id, lat, lon, title, description FROM markers")
+    c.execute("SELECT id, lat, lon, title FROM markers")
     rows = c.fetchall()
     conn.close()
     return rows
 
-def add_marker(lat, lon, title=None, description=None):
+def add_marker(lat, lon, title):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("INSERT INTO markers (lat, lon, title, description) VALUES (?, ?, ?, ?)",
-              (lat, lon, title, description))
+    c.execute("INSERT INTO markers (lat, lon, title) VALUES (?, ?, ?)", (lat, lon, title))
     conn.commit()
     conn.close()
 
-def create_map():
-    markers = get_all_markers()
-    if markers:
-        start_lat, start_lon = markers[0][1], markers[0][2]
-    else:
-        start_lat, start_lon = 13.7563, 100.5018  # กรุงเทพฯ
-
-    m = folium.Map(location=[start_lat, start_lon], zoom_start=12)
-
-    for mkr in markers:
-        _, lat, lon, title, desc = mkr
-        popup_text = f"<b>{title or 'No title'}</b><br>{desc or ''}"
-        folium.Marker(location=[lat, lon], popup=popup_text).add_to(m)
-
-    m.save(MAP_HTML_PATH)
-
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/')
 def index():
-    if request.method == 'POST':
-        title = request.form.get('name')
-        lat = request.form.get('lat')
-        lon = request.form.get('lng')
-        olc_raw = request.form.get('olc', '').strip()
-
-        # แยกแค่ Plus Code ด้านหน้า (ตัดคำตามหลัง)
-        olc_code = olc_raw.split()[0] if olc_raw else ''
-
-        if olc_code:
-            try:
-                if not olc.isFull(olc_code):
-                    ref_lat, ref_lng = 13.7563, 100.5018  # จุดอ้างอิง กรุงเทพฯ
-                    recovered_code = olc.recoverNearest(olc_code, ref_lat, ref_lng)
-                    decoded = olc.decode(recovered_code)
-                else:
-                    decoded = olc.decode(olc_code)
-
-                lat = decoded.latitudeCenter
-                lon = decoded.longitudeCenter
-            except Exception as e:
-                return f"OLC ไม่ถูกต้อง: {str(e)}", 400
-        else:
-            if not lat or not lon or not title:
-                return "กรุณากรอกข้อมูลให้ครบ", 400
-            try:
-                lat = float(lat)
-                lon = float(lon)
-            except ValueError:
-                return "ละติจูดและลองจิจูดต้องเป็นตัวเลข", 400
-
-        add_marker(lat, lon, title)
-        create_map()
-        return redirect(url_for('index'))
-
-    create_map()
     return render_template('map_folium.html')
+
+@app.route('/markers')
+def markers_api():
+    markers = get_all_markers()
+    data = [{"id": m[0], "lat": m[1], "lon": m[2], "title": m[3]} for m in markers]
+    return jsonify(data)
+
+@app.route('/add_marker', methods=['POST'])
+def add_marker_api():
+    data = request.json
+    title = data.get('title')
+    lat = data.get('lat')
+    lon = data.get('lon')
+    olc_code = data.get('olc', '').strip()
+
+    if olc_code:
+        try:
+            if not olc.isFull(olc_code):
+                ref_lat, ref_lon = 13.7563, 100.5018
+                recovered = olc.recoverNearest(olc_code, ref_lat, ref_lon)
+                decoded = olc.decode(recovered)
+            else:
+                decoded = olc.decode(olc_code)
+            lat = decoded.latitudeCenter
+            lon = decoded.longitudeCenter
+        except Exception as e:
+            return {"error": f"OLC ไม่ถูกต้อง: {str(e)}"}, 400
+    else:
+        try:
+            lat = float(lat)
+            lon = float(lon)
+        except:
+            return {"error": "พิกัดละติจูดลองจิจูดไม่ถูกต้อง"}, 400
+
+    if not title:
+        return {"error": "กรุณากรอกชื่อสถานที่"}, 400
+
+    add_marker(lat, lon, title)
+    return {"message": "เพิ่มหมุดสำเร็จ"}, 200
 
 if __name__ == '__main__':
     init_db()
