@@ -10,7 +10,6 @@ app = Flask(__name__)
 DB_PATH = 'markers.db'
 MAP_HTML_PATH = 'static/map.html'
 
-# 🧱 สร้างตาราง markers ถ้ายังไม่มี
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -26,7 +25,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-# 📥 อ่านหมุดทั้งหมด
 def get_all_markers():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -35,7 +33,6 @@ def get_all_markers():
     conn.close()
     return rows
 
-# ➕ เพิ่มหมุด
 def add_marker(lat, lon, title=None, description=None):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -44,7 +41,6 @@ def add_marker(lat, lon, title=None, description=None):
     conn.commit()
     conn.close()
 
-# 🗺️ สร้างแผนที่จากหมุดในฐานข้อมูล
 def create_map():
     markers = get_all_markers()
     if markers:
@@ -61,7 +57,6 @@ def create_map():
 
     m.save(MAP_HTML_PATH)
 
-# 🌐 เส้นทางหลัก
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -70,18 +65,13 @@ def index():
         lon = request.form.get('lng')
         olc_raw = request.form.get('olc', '').strip()
 
-        # ✅ ตัดข้อความหลัง comma เช่น "27FP+8JH, Nonthaburi"
-        if ',' in olc_raw:
-            olc_code = olc_raw.split(',')[0].strip()
-        else:
-            olc_code = olc_raw
+        # แยกแค่ Plus Code ด้านหน้า (ตัดคำตามหลัง)
+        olc_code = olc_raw.split()[0] if olc_raw else ''
 
-        # ✅ ถ้ามี OLC → แปลงเป็นพิกัด
         if olc_code:
             try:
-                # ถ้าไม่ใช่ full code → ใช้ recoverNearest (เช่น Google Maps ใช้ short code)
                 if not olc.isFull(olc_code):
-                    ref_lat, ref_lng = 13.7563, 100.5018  # จุดอ้างอิง = กรุงเทพฯ
+                    ref_lat, ref_lng = 13.7563, 100.5018  # จุดอ้างอิง กรุงเทพฯ
                     recovered_code = olc.recoverNearest(olc_code, ref_lat, ref_lng)
                     decoded = olc.decode(recovered_code)
                 else:
@@ -89,12 +79,9 @@ def index():
 
                 lat = decoded.latitudeCenter
                 lon = decoded.longitudeCenter
-
             except Exception as e:
                 return f"OLC ไม่ถูกต้อง: {str(e)}", 400
-
         else:
-            # ✅ ถ้าไม่มี OLC → ต้องกรอก lat/lng
             if not lat or not lon or not title:
                 return "กรุณากรอกข้อมูลให้ครบ", 400
             try:
@@ -110,8 +97,7 @@ def index():
     create_map()
     return render_template('map_folium.html')
 
-# 🚀 เริ่มรันแอป
 if __name__ == '__main__':
     init_db()
-    port = int(os.environ.get('PORT', 5000))  # ✅ Render จะส่ง PORT มาให้
+    port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
