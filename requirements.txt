@@ -1,0 +1,3 @@
+Flask
+folium
+sqlite3  # ไม่ต้อง pip install, มาพร้อม Python
