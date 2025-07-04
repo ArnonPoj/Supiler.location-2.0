@@ -61,23 +61,38 @@ def create_map():
 
     m.save(MAP_HTML_PATH)
 
-# 🌐 เส้นทางหลัก: แสดงฟอร์ม + แผนที่
+# 🌐 เส้นทางหลัก
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
         title = request.form.get('name')
         lat = request.form.get('lat')
         lon = request.form.get('lng')
-        olc_code = request.form.get('olc')  # ✅ รับรหัส OLC จากฟอร์ม
+        olc_raw = request.form.get('olc', '').strip()
+
+        # ✅ ตัดข้อความหลัง comma เช่น "27FP+8JH, Nonthaburi"
+        if ',' in olc_raw:
+            olc_code = olc_raw.split(',')[0].strip()
+        else:
+            olc_code = olc_raw
 
         # ✅ ถ้ามี OLC → แปลงเป็นพิกัด
         if olc_code:
             try:
-                decoded = olc.decode(olc_code)
+                # ถ้าไม่ใช่ full code → ใช้ recoverNearest (เช่น Google Maps ใช้ short code)
+                if not olc.isFull(olc_code):
+                    ref_lat, ref_lng = 13.7563, 100.5018  # จุดอ้างอิง = กรุงเทพฯ
+                    recovered_code = olc.recoverNearest(olc_code, ref_lat, ref_lng)
+                    decoded = olc.decode(recovered_code)
+                else:
+                    decoded = olc.decode(olc_code)
+
                 lat = decoded.latitudeCenter
                 lon = decoded.longitudeCenter
-            except:
-                return "OLC ไม่ถูกต้อง", 400
+
+            except Exception as e:
+                return f"OLC ไม่ถูกต้อง: {str(e)}", 400
+
         else:
             # ✅ ถ้าไม่มี OLC → ต้องกรอก lat/lng
             if not lat or not lon or not title:
@@ -95,8 +110,8 @@ def index():
     create_map()
     return render_template('map_folium.html')
 
-# 🚀 จุดเริ่มต้น
+# 🚀 เริ่มรันแอป
 if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5000))  # ✅ Render จะส่ง PORT มาให้
-    app.run(host='0.0.0.0', port=port, debug=True)  # ✅ ต้องฟังที่ 0.0.0.0
+    app.run(host='0.0.0.0', port=port, debug=True)
