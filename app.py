@@ -8,6 +8,7 @@ app = Flask(__name__)
 DB_PATH = 'markers.db'
 MAP_HTML_PATH = 'static/map.html'
 
+# 🧱 สร้างตาราง markers ถ้ายังไม่มี
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -23,6 +24,7 @@ def init_db():
     conn.commit()
     conn.close()
 
+# 📥 อ่านหมุดทั้งหมด
 def get_all_markers():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -31,6 +33,7 @@ def get_all_markers():
     conn.close()
     return rows
 
+# ➕ เพิ่มหมุด
 def add_marker(lat, lon, title=None, description=None):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -39,12 +42,13 @@ def add_marker(lat, lon, title=None, description=None):
     conn.commit()
     conn.close()
 
+# 🗺️ สร้างแผนที่จากหมุดในฐานข้อมูล
 def create_map():
     markers = get_all_markers()
     if markers:
         start_lat, start_lon = markers[0][1], markers[0][2]
     else:
-        start_lat, start_lon = 13.7563, 100.5018
+        start_lat, start_lon = 13.7563, 100.5018  # กรุงเทพฯ
 
     m = folium.Map(location=[start_lat, start_lon], zoom_start=12)
 
@@ -55,6 +59,7 @@ def create_map():
 
     m.save(MAP_HTML_PATH)
 
+# 🌐 เส้นทางหลัก: แสดงฟอร์ม + แผนที่
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -78,6 +83,8 @@ def index():
     create_map()
     return render_template('map_folium.html')
 
+# 🚀 จุดเริ่มต้น
 if __name__ == '__main__':
-    init_db()  # เรียกเสมอเพื่อให้แน่ใจว่ามีตาราง markers
-    app.run(debug=True)
+    init_db()
+    port = int(os.environ.get('PORT', 5000))  # ✅ Render จะส่ง PORT มาให้
+    app.run(host='0.0.0.0', port=port, debug=True)  # ✅ ต้องฟังที่ 0.0.0.0
