@@ -1,18 +1,65 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Folium Map</title>
+    <title>Interactive Folium Map</title>
     <meta charset="utf-8">
+    <style>
+        #map { height: 600px; width: 100%; }
+    </style>
+    <!-- โหลด Leaflet CSS/JS จาก CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
-    <h2>📍 แผนที่หมุดจากฐานข้อมูล</h2>
+    <h2>📍 คลิกเพื่อปักหมุดบนแผนที่</h2>
+
     <form method="POST" style="margin-bottom: 10px;">
         <input type="text" name="name" placeholder="ชื่อสถานที่" required>
-        <input type="number" step="any" name="lat" placeholder="ละติจูด" required>
-        <input type="number" step="any" name="lng" placeholder="ลองจิจูด" required>
+        <input type="number" step="any" name="lat" id="lat" placeholder="ละติจูด" required>
+        <input type="number" step="any" name="lng" id="lng" placeholder="ลองจิจูด" required>
         <button type="submit">เพิ่มหมุด</button>
     </form>
 
-    <iframe src="{{ url_for('static', filename='map.html') }}" width="100%" height="600" style="border: none;"></iframe>
+    <!-- แผนที่จะแสดงตรงนี้ -->
+    <div id="map"></div>
+
+    <script>
+        // เริ่มที่กรุงเทพ
+        const map = L.map('map').setView([13.7563, 100.5018], 12);
+
+        // พื้นหลังแผนที่
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // คลิกแล้วปักหมุด + ใส่ค่าละติจูด ลองจิจูดลงในฟอร์ม
+        let marker;
+        map.on('click', function(e) {
+            const { lat, lng } = e.latlng;
+
+            // ใส่ค่าลงใน input
+            document.getElementById('lat').value = lat.toFixed(6);
+            document.getElementById('lng').value = lng.toFixed(6);
+
+            // ลบหมุดเดิม
+            if (marker) {
+                map.removeLayer(marker);
+            }
+
+            // เพิ่มหมุดใหม่
+            marker = L.marker([lat, lng]).addTo(map)
+                .bindPopup('📍 พิกัดนี้').openPopup();
+        });
+
+        // โหลดหมุดจาก static/map.html ที่ Flask สร้างไว้ (optional)
+        fetch("{{ url_for('static', filename='map.html') }}")
+            .then(res => res.text())
+            .then(html => {
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.srcdoc = html;
+                document.body.appendChild(iframe);
+            });
+    </script>
 </body>
 </html>
