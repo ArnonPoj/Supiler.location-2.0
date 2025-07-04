@@ -6,10 +6,8 @@
 <style>
   #mapid { height: 600px; margin-top: 10px; }
 </style>
-<!-- Leaflet CSS/JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-<!-- Open Location Code JS -->
 <script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.min.js"></script>
 </head>
 <body>
@@ -34,7 +32,6 @@
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  // โหลดหมุดจาก backend แล้วปัก
   function loadMarkers() {
     fetch('/markers').then(r => r.json()).then(data => {
       data.forEach(m => {
@@ -44,7 +41,6 @@
   }
   loadMarkers();
 
-  // เพิ่มหมุดจากฟอร์ม
   document.getElementById('formAddMarker').onsubmit = async function(e) {
     e.preventDefault();
     const name = document.getElementById('name').value.trim();
@@ -63,7 +59,6 @@
     const result = await res.json();
     if(res.ok) {
       alert('เพิ่มหมุดสำเร็จ');
-      // รีโหลดหมุดใหม่ทั้งหมด
       map.eachLayer(layer => {
         if(layer instanceof L.Marker) map.removeLayer(layer);
       });
@@ -74,7 +69,6 @@
     }
   };
 
-  // ฟังก์ชันคลิกแผนที่เพิ่มหมุด พร้อม popup กรอกชื่อ
   var tempMarker;
   function onMapClick(e) {
     if(tempMarker) map.removeLayer(tempMarker);
@@ -87,11 +81,10 @@
       <button onclick="savePopupMarker()">บันทึก</button>`
     ).openPopup();
 
-    window.clickedLatLng = e.latlng; // เก็บตำแหน่งไว้
+    window.clickedLatLng = e.latlng;
   }
   map.on('click', onMapClick);
 
-  // ฟังก์ชันส่งข้อมูลจาก popup ไป backend
   async function savePopupMarker() {
     const title = document.getElementById('popupName').value.trim();
     if(!title) {
@@ -113,7 +106,6 @@
       alert('เพิ่มหมุดสำเร็จ');
       map.removeLayer(tempMarker);
       tempMarker = null;
-      // รีโหลดหมุดทั้งหมด
       map.eachLayer(layer => {
         if(layer instanceof L.Marker) map.removeLayer(layer);
       });
@@ -123,5 +115,6 @@
     }
   }
 </script>
+
 </body>
 </html>
