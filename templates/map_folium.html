@@ -1,17 +1,17 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>แผนที่หมุด</title>
 </head>
 <body>
     <h2>📍 เพิ่มหมุดใหม่</h2>
 
     <form method="POST" style="margin-bottom: 10px;">
-        <input type="text" name="name" placeholder="ชื่อสถานที่" required>
-        <input type="text" name="olc" placeholder="OLC (จาก Google Maps)">
-        <input type="number" step="any" name="lat" placeholder="ละติจูด">
-        <input type="number" step="any" name="lng" placeholder="ลองจิจูด">
+        <input type="text" name="name" placeholder="ชื่อสถานที่" required />
+        <input type="text" name="olc" placeholder="OLC (คัดลอกจาก Google Maps)" />
+        <input type="number" step="any" name="lat" placeholder="ละติจูด" />
+        <input type="number" step="any" name="lng" placeholder="ลองจิจูด" />
         <button type="submit">เพิ่มหมุด</button>
     </form>
 
@@ -19,8 +19,13 @@
         💡 คุณสามารถใส่ OLC เช่น <code>27FP+8JH, Sai Noi</code> หรือกรอกพิกัดเองก็ได้
     </p>
 
-    <hr>
+    <hr />
 
-    <iframe src="{{ url_for('static', filename='map.html') }}" width="100%" height="600" style="border: none;"></iframe>
+    <iframe
+        src="{{ url_for('static', filename='map.html') }}"
+        width="100%"
+        height="600"
+        style="border: none;"
+    ></iframe>
 </body>
 </html>
