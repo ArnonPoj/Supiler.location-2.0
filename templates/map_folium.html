@@ -1,76 +1,127 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8" />
-    <title>แผนที่หมุด + คลิกเพิ่มจุด + OLC</title>
-    <style>
-        #mapid { height: 600px; margin-top: 10px; }
-    </style>
-
-    <!-- โหลด Leaflet CSS/JS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-
-    <!-- โหลด Open Location Code JS ไลบรารี -->
-    <script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.min.js"></script>
+<meta charset="UTF-8" />
+<title>แผนที่ปักหมุด 2 แบบ</title>
+<style>
+  #mapid { height: 600px; margin-top: 10px; }
+</style>
+<!-- Leaflet CSS/JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+<!-- Open Location Code JS -->
+<script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.min.js"></script>
 </head>
 <body>
-    <h2>📍 เพิ่มหมุดใหม่</h2>
 
-    <form method="POST" style="margin-bottom: 10px;">
-        <input type="text" name="name" placeholder="ชื่อสถานที่" required />
-        <input type="text" name="olc" id="olc" placeholder="OLC (คัดลอกจาก Google Maps)" />
-        <input type="number" step="any" name="lat" id="lat" placeholder="ละติจูด" />
-        <input type="number" step="any" name="lng" id="lng" placeholder="ลองจิจูด" />
-        <button type="submit">เพิ่มหมุด</button>
-    </form>
+<h2>เพิ่มหมุดด้วยฟอร์ม (กรอกชื่อ + OLC หรือ lat/lng)</h2>
+<form id="formAddMarker">
+  <input type="text" name="name" id="name" placeholder="ชื่อสถานที่" required />
+  <input type="text" name="olc" id="olc" placeholder="OLC (เช่น 27FP+8JH, Sai Noi)" />
+  <input type="number" step="any" name="lat" id="lat" placeholder="ละติจูด" />
+  <input type="number" step="any" name="lng" id="lng" placeholder="ลองจิจูด" />
+  <button type="submit">เพิ่มหมุด</button>
+</form>
 
-    <p style="font-size: 0.9em; color: gray;">
-        💡 คุณสามารถใส่ OLC เช่น <code>27FP+8JH, Sai Noi</code> หรือกรอกพิกัดเองก็ได้<br />
-        หรือคลิกบนแผนที่เพื่อเติมพิกัดและ OLC อัตโนมัติ
-    </p>
+<p>หรือคลิกบนแผนที่เพื่อเพิ่มหมุด (จะมี popup ให้กรอกชื่อ)</p>
 
-    <hr />
+<div id="mapid"></div>
 
-    <div id="mapid"></div>
+<script>
+  var map = L.map('mapid').setView([13.7563, 100.5018], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
 
-    <script>
-        // สร้างแผนที่ที่กรุงเทพฯ
-        var map = L.map('mapid').setView([13.7563, 100.5018], 12);
+  // โหลดหมุดจาก backend แล้วปัก
+  function loadMarkers() {
+    fetch('/markers').then(r => r.json()).then(data => {
+      data.forEach(m => {
+        L.marker([m.lat, m.lon]).addTo(map).bindPopup(m.title || 'No title');
+      });
+    });
+  }
+  loadMarkers();
 
-        // โหลดแผนที่จาก OpenStreetMap
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+  // เพิ่มหมุดจากฟอร์ม
+  document.getElementById('formAddMarker').onsubmit = async function(e) {
+    e.preventDefault();
+    const name = document.getElementById('name').value.trim();
+    const olc = document.getElementById('olc').value.trim();
+    const lat = document.getElementById('lat').value.trim();
+    const lng = document.getElementById('lng').value.trim();
 
-        // เก็บ marker ที่คลิกล่าสุด
-        var marker = null;
+    const payload = {title: name, olc, lat, lon: lng};
 
-        // ฟังก์ชันเมื่อคลิกบนแผนที่
-        function onMapClick(e) {
-            var lat = e.latlng.lat;
-            var lng = e.latlng.lng;
+    const res = await fetch('/add_marker', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
 
-            if (marker) {
-                marker.setLatLng(e.latlng);
-            } else {
-                marker = L.marker(e.latlng).addTo(map);
-            }
+    const result = await res.json();
+    if(res.ok) {
+      alert('เพิ่มหมุดสำเร็จ');
+      // รีโหลดหมุดใหม่ทั้งหมด
+      map.eachLayer(layer => {
+        if(layer instanceof L.Marker) map.removeLayer(layer);
+      });
+      loadMarkers();
+      this.reset();
+    } else {
+      alert('ผิดพลาด: ' + result.error);
+    }
+  };
 
-            // เติมค่า lat/lng ลงช่องฟอร์ม
-            document.getElementById('lat').value = lat.toFixed(6);
-            document.getElementById('lng').value = lng.toFixed(6);
+  // ฟังก์ชันคลิกแผนที่เพิ่มหมุด พร้อม popup กรอกชื่อ
+  var tempMarker;
+  function onMapClick(e) {
+    if(tempMarker) map.removeLayer(tempMarker);
 
-            // แปลงพิกัดเป็น OLC แล้วเติมช่อง olc
-            var plusCode = OpenLocationCode.encode(lat, lng);
-            document.getElementById('olc').value = plusCode;
-        }
+    tempMarker = L.marker(e.latlng).addTo(map);
 
-        map.on('click', onMapClick);
+    tempMarker.bindPopup(
+      `<b>เพิ่มหมุดใหม่</b><br>
+      <input type="text" id="popupName" placeholder="ชื่อสถานที่" />
+      <button onclick="savePopupMarker()">บันทึก</button>`
+    ).openPopup();
 
-        // TODO: ถ้าต้องการโหลดหมุดจาก backend มาปักบนแผนที่
-        // (สามารถแก้ไขเพิ่มเติมในส่วนนี้ได้)
-    </script>
+    window.clickedLatLng = e.latlng; // เก็บตำแหน่งไว้
+  }
+  map.on('click', onMapClick);
+
+  // ฟังก์ชันส่งข้อมูลจาก popup ไป backend
+  async function savePopupMarker() {
+    const title = document.getElementById('popupName').value.trim();
+    if(!title) {
+      alert('กรุณากรอกชื่อสถานที่');
+      return;
+    }
+    const {lat, lng} = window.clickedLatLng;
+
+    const payload = {title, lat, lon: lng};
+
+    const res = await fetch('/add_marker', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+
+    if(res.ok) {
+      alert('เพิ่มหมุดสำเร็จ');
+      map.removeLayer(tempMarker);
+      tempMarker = null;
+      // รีโหลดหมุดทั้งหมด
+      map.eachLayer(layer => {
+        if(layer instanceof L.Marker) map.removeLayer(layer);
+      });
+      loadMarkers();
+    } else {
+      alert('ผิดพลาด: ' + result.error);
+    }
+  }
+</script>
 </body>
 </html>
