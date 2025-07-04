@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Folium Map</title>
+</head>
+<body>
+    <h2>📍 แผนที่หมุดจากฐานข้อมูล</h2>
+    <form method="POST" style="margin-bottom: 10px;">
+        <input type="text" name="name" placeholder="ชื่อสถานที่" required>
+        <input type="number" step="any" name="lat" placeholder="ละติจูด" required>
+        <input type="number" step="any" name="lng" placeholder="ลองจิจูด" required>
+        <button type="submit">เพิ่มหมุด</button>
+    </form>
+
+    <iframe src="{{ url_for('static', filename='map.html') }}" width="100%" height="600"></iframe>
+</body>
+</html>
