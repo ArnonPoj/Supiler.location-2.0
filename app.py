@@ -3,6 +3,8 @@ import sqlite3
 import folium
 import os
 
+from openlocationcode import openlocationcode as olc
+
 app = Flask(__name__)
 
 DB_PATH = 'markers.db'
