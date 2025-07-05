@@ -5,10 +5,13 @@ from openlocationcode import openlocationcode as olc
 
 app = Flask(__name__)
 
-# ✅ ใช้ Environment Variable จาก Render เช่น DATABASE_URL
+# อ่าน DATABASE_URL จาก environment
 DATABASE_URL = os.environ.get("DATABASE_URL")
+print("DATABASE_URL =", DATABASE_URL)  # Debug: แสดงค่า DATABASE_URL ตอนรัน
 
 def get_conn():
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL ยังไม่ถูกตั้งใน environment variable")
     return psycopg2.connect(DATABASE_URL)
 
 def init_db():
