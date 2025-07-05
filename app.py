@@ -26,7 +26,7 @@ def init_db():
             title TEXT NOT NULL
         )
     ''')
-    # เพิ่มคอลัมน์ olc, address, detail ถ้ายังไม่มี
+    # เพิ่มคอลัมน์ olc, address, detail ถ้ายังไม่มี (ใช้ PostgreSQL 9.6+ ที่รองรับ IF NOT EXISTS)
     c.execute("ALTER TABLE markers ADD COLUMN IF NOT EXISTS olc TEXT;")
     c.execute("ALTER TABLE markers ADD COLUMN IF NOT EXISTS address TEXT;")
     c.execute("ALTER TABLE markers ADD COLUMN IF NOT EXISTS detail TEXT;")
@@ -87,7 +87,6 @@ def index():
         ).add_to(m)
 
     map_html = m._repr_html_()
-
     return render_template('map_folium.html', map_html=map_html)
 
 @app.route('/add_marker', methods=['POST'])
