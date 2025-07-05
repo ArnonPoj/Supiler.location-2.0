@@ -71,7 +71,6 @@ def index():
 
     for mkr in markers:
         _, lat, lon, title, olc_code, address, detail = mkr
-        # สร้าง popup HTML แบบสวยงาม
         popup_html = f"""
         <div style="min-width:200px;">
             <b>{title}</b><br>
