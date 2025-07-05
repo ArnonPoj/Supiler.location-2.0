@@ -1,3 +1,4 @@
 Flask
 folium
 openlocationcode
+psycopg2-binary
