@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import psycopg2
 import os
+import folium
 from openlocationcode import openlocationcode as olc
 
 app = Flask(__name__)
@@ -59,23 +60,32 @@ def decode_olc(code, ref_lat=13.7563, ref_lon=100.5018):
 
 @app.route('/')
 def index():
-    return render_template('map_leaflet.html')
-
-@app.route('/markers')
-def markers_api():
     markers = get_all_markers()
-    data = []
-    for m in markers:
-        data.append({
-            "id": m[0],
-            "lat": m[1],
-            "lon": m[2],
-            "title": m[3],
-            "olc": m[4],
-            "address": m[5],
-            "detail": m[6]
-        })
-    return jsonify(data)
+    # สร้างแผนที่ Folium
+    if markers:
+        start_lat, start_lon = markers[0][1], markers[0][2]
+    else:
+        start_lat, start_lon = 13.7563, 100.5018  # กรุงเทพฯ
+
+    m = folium.Map(location=[start_lat, start_lon], zoom_start=12)
+
+    for mkr in markers:
+        _, lat, lon, title, olc_code, address, detail = mkr
+        popup_html = f"""
+        <b>{title}</b><br>
+        <b>OLC:</b> {olc_code or '-'}<br>
+        <b>ที่อยู่:</b> {address or '-'}<br>
+        <b>รายละเอียด:</b> {detail or '-'}
+        """
+        folium.Marker(
+            location=[lat, lon],
+            popup=popup_html,
+            tooltip=title
+        ).add_to(m)
+
+    map_html = m._repr_html_()
+
+    return render_template('map_folium.html', map_html=map_html)
 
 @app.route('/add_marker', methods=['POST'])
 def add_marker_api():
