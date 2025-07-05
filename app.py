@@ -61,7 +61,7 @@ def decode_olc(code, ref_lat=13.7563, ref_lon=100.5018):
 @app.route('/')
 def index():
     markers = get_all_markers()
-    # สร้างแผนที่ Folium
+    # กำหนดตำแหน่งเริ่มต้นแผนที่
     if markers:
         start_lat, start_lon = markers[0][1], markers[0][2]
     else:
@@ -71,15 +71,18 @@ def index():
 
     for mkr in markers:
         _, lat, lon, title, olc_code, address, detail = mkr
+        # สร้าง popup HTML แบบสวยงาม
         popup_html = f"""
-        <b>{title}</b><br>
-        <b>OLC:</b> {olc_code or '-'}<br>
-        <b>ที่อยู่:</b> {address or '-'}<br>
-        <b>รายละเอียด:</b> {detail or '-'}
+        <div style="min-width:200px;">
+            <b>{title}</b><br>
+            <b>OLC:</b> {olc_code or '-'}<br>
+            <b>ที่อยู่:</b> {address or '-'}<br>
+            <b>รายละเอียด:</b> {detail or '-'}
+        </div>
         """
         folium.Marker(
             location=[lat, lon],
-            popup=popup_html,
+            popup=folium.Popup(popup_html, max_width=300),
             tooltip=title
         ).add_to(m)
 
