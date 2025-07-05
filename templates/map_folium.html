@@ -85,12 +85,12 @@
 
     fetch('/markers').then(r => r.json()).then(data => {
       data.forEach(m => {
-        const popupContent = `
+        const popupContent = 
           <b>${m.title}</b><br>
           <b>OLC:</b> ${m.olc || '-'}<br>
           <b>ที่อยู่:</b> ${m.address || '-'}<br>
           <b>รายละเอียด:</b> ${m.detail || '-'}
-        `;
+        ;
         const marker = L.marker([m.lat, m.lon])
           .addTo(map)
           .bindPopup(popupContent)
@@ -106,13 +106,13 @@
   function onMapClick(e) {
     if (tempMarker) map.removeLayer(tempMarker);
     tempMarker = L.marker(e.latlng).addTo(map);
-    tempMarker.bindPopup(`
+    tempMarker.bindPopup(
       <b>เพิ่มหมุดใหม่</b><br>
       <input type="text" id="popupName" placeholder="ชื่อสถานที่" /><br>
       <textarea id="popupAddress" placeholder="ที่อยู่ (ถ้ามี)"></textarea><br>
       <textarea id="popupDetail" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea><br>
       <button onclick="savePopupMarker()">บันทึก</button>
-    `).openPopup();
+    ).openPopup();
     window.clickedLatLng = e.latlng;
   }
   map.on('click', onMapClick);
@@ -145,14 +145,14 @@
 
   // ✅ กดปุ่มลอย → แสดง popup สำหรับกรอก OLC
   document.getElementById("floatBtn").onclick = function() {
-    const content = `
+    const content = 
       <b>เพิ่มหมุดจาก OLC</b><br>
       <input type="text" id="olcInput" placeholder="เช่น 27FP+8JH" /><br>
       <input type="text" id="titleInput" placeholder="ชื่อสถานที่" /><br>
       <textarea id="addressInput" placeholder="ที่อยู่ (ถ้ามี)"></textarea><br>
       <textarea id="detailInput" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea><br>
       <button onclick="submitOLC()">บันทึก</button>
-    `;
+    ;
     const center = map.getCenter();
     L.popup()
       .setLatLng(center)
