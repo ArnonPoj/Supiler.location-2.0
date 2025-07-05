@@ -5,9 +5,8 @@ from openlocationcode import openlocationcode as olc
 
 app = Flask(__name__)
 
-# อ่าน DATABASE_URL จาก environment variable
 DATABASE_URL = os.environ.get("DATABASE_URL")
-print("DATABASE_URL =", DATABASE_URL)  # Debug: แสดงค่า DATABASE_URL ตอนรัน
+print("DATABASE_URL =", DATABASE_URL)  # Debug
 
 def get_conn():
     if not DATABASE_URL:
@@ -22,7 +21,10 @@ def init_db():
             id SERIAL PRIMARY KEY,
             lat DOUBLE PRECISION NOT NULL,
             lon DOUBLE PRECISION NOT NULL,
-            title TEXT NOT NULL
+            title TEXT NOT NULL,
+            olc TEXT,
+            address TEXT,
+            detail TEXT
         )
     ''')
     conn.commit()
@@ -31,15 +33,18 @@ def init_db():
 def get_all_markers():
     conn = get_conn()
     c = conn.cursor()
-    c.execute("SELECT id, lat, lon, title FROM markers")
+    c.execute("SELECT id, lat, lon, title, olc, address, detail FROM markers")
     rows = c.fetchall()
     conn.close()
     return rows
 
-def add_marker(lat, lon, title):
+def add_marker(lat, lon, title, olc_code=None, address=None, detail=None):
     conn = get_conn()
     c = conn.cursor()
-    c.execute("INSERT INTO markers (lat, lon, title) VALUES (%s, %s, %s)", (lat, lon, title))
+    c.execute("""
+        INSERT INTO markers (lat, lon, title, olc, address, detail)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (lat, lon, title, olc_code, address, detail))
     conn.commit()
     conn.close()
 
@@ -54,12 +59,22 @@ def decode_olc(code, ref_lat=13.7563, ref_lon=100.5018):
 
 @app.route('/')
 def index():
-    return render_template('map_folium.html')
+    return render_template('map_leaflet.html')
 
 @app.route('/markers')
 def markers_api():
     markers = get_all_markers()
-    data = [{"id": m[0], "lat": m[1], "lon": m[2], "title": m[3]} for m in markers]
+    data = []
+    for m in markers:
+        data.append({
+            "id": m[0],
+            "lat": m[1],
+            "lon": m[2],
+            "title": m[3],
+            "olc": m[4],
+            "address": m[5],
+            "detail": m[6]
+        })
     return jsonify(data)
 
 @app.route('/add_marker', methods=['POST'])
@@ -68,7 +83,9 @@ def add_marker_api():
     title = data.get('title')
     lat = data.get('lat')
     lon = data.get('lon')
-    olc_code = data.get('olc', '').strip()
+    olc_code = data.get('olc', '').strip() or None
+    address = data.get('address', '').strip() or None
+    detail = data.get('detail', '').strip() or None
 
     if olc_code:
         try:
@@ -85,7 +102,7 @@ def add_marker_api():
     if not title:
         return {"error": "กรุณากรอกชื่อสถานที่"}, 400
 
-    add_marker(lat, lon, title)
+    add_marker(lat, lon, title, olc_code, address, detail)
     return {"message": "เพิ่มหมุดสำเร็จ"}, 200
 
 if __name__ == '__main__':
