@@ -26,7 +26,6 @@ def init_db():
             title TEXT NOT NULL
         )
     ''')
-    # เพิ่มคอลัมน์ olc, address, detail ถ้ายังไม่มี (ใช้ PostgreSQL 9.6+ ที่รองรับ IF NOT EXISTS)
     c.execute("ALTER TABLE markers ADD COLUMN IF NOT EXISTS olc TEXT;")
     c.execute("ALTER TABLE markers ADD COLUMN IF NOT EXISTS address TEXT;")
     c.execute("ALTER TABLE markers ADD COLUMN IF NOT EXISTS detail TEXT;")
@@ -59,6 +58,23 @@ def decode_olc(code, ref_lat=13.7563, ref_lon=100.5018):
     else:
         decoded = olc.decode(plus_code)
     return decoded.latitudeCenter, decoded.longitudeCenter
+
+@app.route('/markers')
+def markers_api():
+    markers = get_all_markers()
+    data = []
+    for m in markers:
+        id, lat, lon, title, olc_code, address, detail = m
+        data.append({
+            'id': id,
+            'lat': lat,
+            'lon': lon,
+            'title': title,
+            'olc': olc_code,
+            'address': address,
+            'detail': detail,
+        })
+    return jsonify(data)
 
 @app.route('/')
 def index():
