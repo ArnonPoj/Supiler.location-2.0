@@ -17,17 +17,19 @@ def get_conn():
 def init_db():
     conn = get_conn()
     c = conn.cursor()
+    # สร้างตารางถ้ายังไม่มี
     c.execute('''
         CREATE TABLE IF NOT EXISTS markers (
             id SERIAL PRIMARY KEY,
             lat DOUBLE PRECISION NOT NULL,
             lon DOUBLE PRECISION NOT NULL,
-            title TEXT NOT NULL,
-            olc TEXT,
-            address TEXT,
-            detail TEXT
+            title TEXT NOT NULL
         )
     ''')
+    # เพิ่มคอลัมน์ olc, address, detail ถ้ายังไม่มี
+    c.execute("ALTER TABLE markers ADD COLUMN IF NOT EXISTS olc TEXT;")
+    c.execute("ALTER TABLE markers ADD COLUMN IF NOT EXISTS address TEXT;")
+    c.execute("ALTER TABLE markers ADD COLUMN IF NOT EXISTS detail TEXT;")
     conn.commit()
     conn.close()
 
@@ -61,11 +63,10 @@ def decode_olc(code, ref_lat=13.7563, ref_lon=100.5018):
 @app.route('/')
 def index():
     markers = get_all_markers()
-    # กำหนดตำแหน่งเริ่มต้นแผนที่
     if markers:
         start_lat, start_lon = markers[0][1], markers[0][2]
     else:
-        start_lat, start_lon = 13.7563, 100.5018  # กรุงเทพฯ
+        start_lat, start_lon = 13.7563, 100.5018
 
     m = folium.Map(location=[start_lat, start_lon], zoom_start=12)
 
