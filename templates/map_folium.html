@@ -1,51 +1,174 @@
-var tempMarker;
-
-function onMapClick(e) {
-  if (tempMarker) map.removeLayer(tempMarker);
-
-  tempMarker = L.marker(e.latlng).addTo(map);
-
-  tempMarker.bindPopup(`
-    <b>เพิ่มหมุดใหม่</b><br>
-    <input type="text" id="popupName" placeholder="ชื่อสถานที่" /><br>
-    <textarea id="popupAddress" placeholder="ที่อยู่ (ถ้ามี)"></textarea><br>
-    <textarea id="popupDetail" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea><br>
-    <button onclick="savePopupMarker()">บันทึก</button>
-  `).openPopup();
-
-  window.clickedLatLng = e.latlng;
-}
-
-map.on('click', onMapClick);
-
-async function savePopupMarker() {
-  const title = document.getElementById('popupName').value.trim();
-  const address = document.getElementById('popupAddress').value.trim();
-  const detail = document.getElementById('popupDetail').value.trim();
-
-  if (!title) {
-    alert('กรุณากรอกชื่อสถานที่');
-    return;
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<title>แผนที่ปักหมุด 2 แบบ พร้อมข้อมูล OLC</title>
+<style>
+  body, html {
+    height: 100%;
+    margin: 0; padding: 0;
+    font-family: Arial, sans-serif;
   }
-
-  const { lat, lng } = window.clickedLatLng;
-
-  const payload = { title, lat, lon: lng, address, detail };
-
-  const res = await fetch('/add_marker', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  const result = await res.json();
-
-  if (res.ok) {
-    alert('เพิ่มหมุดสำเร็จ');
-    map.removeLayer(tempMarker);
-    tempMarker = null;
-    loadMarkers();
-  } else {
-    alert('ผิดพลาด: ' + result.error);
+  #container {
+    display: flex;
+    height: 100vh;
   }
-}
+  #sidebar {
+    width: 320px;
+    padding: 15px;
+    box-sizing: border-box;
+    background: #f7f7f7;
+    border-right: 1px solid #ccc;
+    overflow-y: auto;
+  }
+  #mapid {
+    flex-grow: 1;
+  }
+  input, button, textarea {
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 8px;
+    font-size: 14px;
+    box-sizing: border-box;
+  }
+  textarea {
+    resize: vertical;
+  }
+</style>
+<!-- Leaflet CSS/JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+<!-- Open Location Code JS -->
+<script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.min.js"></script>
+</head>
+<body>
+
+<div id="container">
+  <div id="sidebar">
+    <h2>เพิ่มหมุดด้วยฟอร์ม</h2>
+    <form id="formAddMarker">
+      <input type="text" name="name" id="name" placeholder="ชื่อสถานที่" required />
+      <input type="text" name="olc" id="olc" placeholder="OLC (เช่น 27FP+8JH Sai Noi)" />
+      <input type="number" step="any" name="lat" id="lat" placeholder="ละติจูด (ถ้าไม่มี OLC)" />
+      <input type="number" step="any" name="lng" id="lng" placeholder="ลองจิจูด (ถ้าไม่มี OLC)" />
+      <textarea name="address" id="address" placeholder="ที่อยู่ (ถ้ามี)"></textarea>
+      <textarea name="detail" id="detail" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
+      <button type="submit">เพิ่มหมุด</button>
+    </form>
+    <p>หรือคลิกบนแผนที่เพื่อเพิ่มหมุด (จะมี popup ให้กรอกชื่อ, ที่อยู่, รายละเอียด)</p>
+  </div>
+
+  <div id="mapid"></div>
+</div>
+
+<script>
+  var map = L.map('mapid').setView([13.7563, 100.5018], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  var markers = [];
+
+  function loadMarkers() {
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+
+    fetch('/markers').then(r => r.json()).then(data => {
+      data.forEach(m => {
+        const popupContent = `
+          <b>${m.title}</b><br>
+          <b>OLC:</b> ${m.olc || '-'}<br>
+          <b>ที่อยู่:</b> ${m.address || '-'}<br>
+          <b>รายละเอียด:</b> ${m.detail || '-'}
+        `;
+
+        const marker = L.marker([m.lat, m.lon])
+          .addTo(map)
+          .bindPopup(popupContent)
+          .bindTooltip(m.title || 'No title');
+
+        markers.push(marker);
+      });
+    });
+  }
+  loadMarkers();
+
+  document.getElementById('formAddMarker').onsubmit = async function(e) {
+    e.preventDefault();
+    const name = document.getElementById('name').value.trim();
+    const olc = document.getElementById('olc').value.trim();
+    const lat = document.getElementById('lat').value.trim();
+    const lng = document.getElementById('lng').value.trim();
+    const address = document.getElementById('address').value.trim();
+    const detail = document.getElementById('detail').value.trim();
+
+    const payload = {title: name, olc, lat, lon: lng, address, detail};
+
+    const res = await fetch('/add_marker', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+
+    const result = await res.json();
+    if(res.ok) {
+      alert('เพิ่มหมุดสำเร็จ');
+      loadMarkers();
+      this.reset();
+    } else {
+      alert('ผิดพลาด: ' + result.error);
+    }
+  };
+
+  var tempMarker;
+  function onMapClick(e) {
+    if(tempMarker) map.removeLayer(tempMarker);
+
+    tempMarker = L.marker(e.latlng).addTo(map);
+
+    tempMarker.bindPopup(`
+      <b>เพิ่มหมุดใหม่</b><br>
+      <input type="text" id="popupName" placeholder="ชื่อสถานที่" /><br>
+      <textarea id="popupAddress" placeholder="ที่อยู่ (ถ้ามี)"></textarea><br>
+      <textarea id="popupDetail" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea><br>
+      <button onclick="savePopupMarker()">บันทึก</button>
+    `).openPopup();
+
+    window.clickedLatLng = e.latlng;
+  }
+  map.on('click', onMapClick);
+
+  async function savePopupMarker() {
+    const title = document.getElementById('popupName').value.trim();
+    const address = document.getElementById('popupAddress').value.trim();
+    const detail = document.getElementById('popupDetail').value.trim();
+
+    if(!title) {
+      alert('กรุณากรอกชื่อสถานที่');
+      return;
+    }
+    const {lat, lng} = window.clickedLatLng;
+
+    const payload = {title, lat, lon: lng, address, detail};
+
+    const res = await fetch('/add_marker', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+
+    if(res.ok) {
+      alert('เพิ่มหมุดสำเร็จ');
+      map.removeLayer(tempMarker);
+      tempMarker = null;
+      loadMarkers();
+    } else {
+      alert('ผิดพลาด: ' + result.error);
+    }
+  }
+</script>
+
+</body>
+</html>
