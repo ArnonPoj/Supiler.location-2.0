@@ -1,20 +1,24 @@
 from flask import Flask, render_template, request, jsonify
-import sqlite3
+import psycopg2
 import os
 from openlocationcode import openlocationcode as olc
 
 app = Flask(__name__)
 
-DB_PATH = 'markers.db'
+# ✅ ใช้ Environment Variable จาก Render เช่น DATABASE_URL
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+def get_conn():
+    return psycopg2.connect(DATABASE_URL)
 
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS markers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            lat REAL NOT NULL,
-            lon REAL NOT NULL,
+            id SERIAL PRIMARY KEY,
+            lat DOUBLE PRECISION NOT NULL,
+            lon DOUBLE PRECISION NOT NULL,
             title TEXT NOT NULL
         )
     ''')
@@ -22,7 +26,7 @@ def init_db():
     conn.close()
 
 def get_all_markers():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
     c.execute("SELECT id, lat, lon, title FROM markers")
     rows = c.fetchall()
@@ -30,9 +34,9 @@ def get_all_markers():
     return rows
 
 def add_marker(lat, lon, title):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_conn()
     c = conn.cursor()
-    c.execute("INSERT INTO markers (lat, lon, title) VALUES (?, ?, ?)", (lat, lon, title))
+    c.execute("INSERT INTO markers (lat, lon, title) VALUES (%s, %s, %s)", (lat, lon, title))
     conn.commit()
     conn.close()
 
