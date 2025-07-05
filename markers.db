@@ -1,3 +1,9 @@
-ALTER TABLE markers ADD COLUMN address TEXT;
-ALTER TABLE markers ADD COLUMN olc TEXT;
-ALTER TABLE markers ADD COLUMN detail TEXT;
+CREATE TABLE IF NOT EXISTS markers (
+    id SERIAL PRIMARY KEY,
+    lat DOUBLE PRECISION NOT NULL,
+    lon DOUBLE PRECISION NOT NULL,
+    title TEXT NOT NULL,
+    olc TEXT,
+    address TEXT,
+    detail TEXT
+);
