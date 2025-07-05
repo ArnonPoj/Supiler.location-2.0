@@ -1,99 +1,51 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>แผนที่หมุดพร้อม OLC</title>
-    <meta charset="utf-8" />
-    <style>
-        #map {
-            width: 100%;
-            height: 90vh;
-        }
-        #olc-button {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            z-index: 9999;
-        }
-        #olc-form {
-            position: fixed;
-            bottom: 80px;
-            right: 30px;
-            z-index: 9999;
-            background: white;
-            padding: 15px;
-            box-shadow: 0 0 8px rgba(0,0,0,0.3);
-            border-radius: 8px;
-            display: none;
-            width: 280px;
-        }
-        #olc-form input, #olc-form textarea {
-            width: 100%;
-            margin-bottom: 8px;
-            padding: 6px;
-            box-sizing: border-box;
-            font-size: 14px;
-        }
-        #olc-form button {
-            margin-right: 8px;
-            padding: 6px 12px;
-            font-size: 14px;
-        }
-    </style>
-</head>
-<body>
+var tempMarker;
 
-<h2 style="text-align:center;">📍 แผนที่หมุดพร้อม OLC และข้อมูลซัพ</h2>
+function onMapClick(e) {
+  if (tempMarker) map.removeLayer(tempMarker);
 
-<!-- ปุ่มลอยเปิดฟอร์ม -->
-<div id="olc-button">
-    <button onclick="toggleOlcForm()">➕ เพิ่มหมุดด้วย OLC</button>
-</div>
+  tempMarker = L.marker(e.latlng).addTo(map);
 
-<!-- ฟอร์มใส่ OLC + ข้อมูล -->
-<div id="olc-form">
-    <input type="text" id="olc-code" placeholder="กรอก Plus Code (OLC) เช่น 7P4M+2C" />
-    <input type="text" id="title" placeholder="ชื่อซัพ" />
-    <textarea id="address" placeholder="ที่อยู่ (ถ้ามี)"></textarea>
-    <textarea id="detail" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
-    <button onclick="submitOlcMarker()">เพิ่มหมุด</button>
-    <button onclick="toggleOlcForm()">ยกเลิก</button>
-</div>
+  tempMarker.bindPopup(`
+    <b>เพิ่มหมุดใหม่</b><br>
+    <input type="text" id="popupName" placeholder="ชื่อสถานที่" /><br>
+    <textarea id="popupAddress" placeholder="ที่อยู่ (ถ้ามี)"></textarea><br>
+    <textarea id="popupDetail" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea><br>
+    <button onclick="savePopupMarker()">บันทึก</button>
+  `).openPopup();
 
-<!-- แผนที่ Folium -->
-<div id="map">{{ map_html|safe }}</div>
-
-<script>
-function toggleOlcForm() {
-    const f = document.getElementById('olc-form');
-    f.style.display = (f.style.display === 'none' || f.style.display === '') ? 'block' : 'none';
+  window.clickedLatLng = e.latlng;
 }
 
-function submitOlcMarker() {
-    const olc = document.getElementById('olc-code').value.trim();
-    const title = document.getElementById('title').value.trim();
-    const address = document.getElementById('address').value.trim();
-    const detail = document.getElementById('detail').value.trim();
+map.on('click', onMapClick);
 
-    if (!olc || !title) {
-        alert('กรุณากรอก OLC และชื่อซัพ');
-        return;
-    }
+async function savePopupMarker() {
+  const title = document.getElementById('popupName').value.trim();
+  const address = document.getElementById('popupAddress').value.trim();
+  const detail = document.getElementById('popupDetail').value.trim();
 
-    fetch('/add_marker', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ olc, title, address, detail })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.error) alert(data.error);
-        else {
-            alert(data.message);
-            location.reload();
-        }
-    });
+  if (!title) {
+    alert('กรุณากรอกชื่อสถานที่');
+    return;
+  }
+
+  const { lat, lng } = window.clickedLatLng;
+
+  const payload = { title, lat, lon: lng, address, detail };
+
+  const res = await fetch('/add_marker', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const result = await res.json();
+
+  if (res.ok) {
+    alert('เพิ่มหมุดสำเร็จ');
+    map.removeLayer(tempMarker);
+    tempMarker = null;
+    loadMarkers();
+  } else {
+    alert('ผิดพลาด: ' + result.error);
+  }
 }
-</script>
-
-</body>
-</html>
