@@ -1,1 +1,3 @@
-
+ALTER TABLE markers ADD COLUMN address TEXT;
+ALTER TABLE markers ADD COLUMN olc TEXT;
+ALTER TABLE markers ADD COLUMN detail TEXT;
