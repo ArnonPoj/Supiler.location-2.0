@@ -5,7 +5,7 @@ from openlocationcode import openlocationcode as olc
 
 app = Flask(__name__)
 
-# อ่าน DATABASE_URL จาก environment
+# อ่าน DATABASE_URL จาก environment variable
 DATABASE_URL = os.environ.get("DATABASE_URL")
 print("DATABASE_URL =", DATABASE_URL)  # Debug: แสดงค่า DATABASE_URL ตอนรัน
 
