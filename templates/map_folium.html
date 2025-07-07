@@ -1,191 +1,125 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta charset="UTF-8" />
-  <title>แผนที่ปักหมุด 2 แบบ พร้อมข้อมูล OLC</title>
-  <style>
-    body, html {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      font-family: Arial, sans-serif;
-    }
-    #container {
-      display: flex;
-      height: 100vh;
-    }
-    #sidebar {
-      width: 320px;
-      padding: 15px;
-      box-sizing: border-box;
-      background: #f7f7f7;
-      border-right: 1px solid #ccc;
-      overflow-y: auto;
-    }
-    #mapid {
-      flex-grow: 1;
-    }
-    input, button, textarea {
-      width: 100%;
-      margin-bottom: 8px;
-      padding: 8px;
-      font-size: 14px;
-      box-sizing: border-box;
-    }
-    textarea {
-      resize: vertical;
-    }
+var map = L.map('mapid').setView([13.7563, 100.5018], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '© OpenStreetMap'
+}).addTo(map);
 
-    /* ✅ ปุ่มลอยเพิ่มหมุด */
-    #floatBtn {
-      position: absolute;
-      bottom: 20px;
-      right: 20px;
-      width: 48px;
-      height: 48px;
-      border-radius: 24px;
-      font-size: 28px;
-      background: #007bff;
-      color: white;
-      border: none;
-      cursor: pointer;
-      z-index: 999;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    }
-  </style>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.min.js"></script>
-</head>
-<body>
+var markers = [];
 
-<div id="container">
-  <div id="sidebar">
-    <h2>เพิ่มหมุด</h2>
-    <p>คลิกแผนที่หรือกดปุ่ม <b>+</b> ล่างขวาเพื่อเพิ่มหมุด</p>
-  </div>
-  <div id="mapid"></div>
-</div>
+function loadMarkers() {
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
 
-<!-- ✅ ปุ่มลอย -->
-<button id="floatBtn">+</button>
-
-<script>
-  var map = L.map('mapid').setView([13.7563, 100.5018], 12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap'
-  }).addTo(map);
-
-  var markers = [];
-
-  function loadMarkers() {
-    markers.forEach(m => map.removeLayer(m));
-    markers = [];
-
-    fetch('/markers').then(r => r.json()).then(data => {
-      data.forEach(m => {
-        const popupContent = `
-          <b>${m.title}</b><br>
-          <b>OLC:</b> ${m.olc || '-'}<br>
-          <b>ที่อยู่:</b> ${m.address || '-'}<br>
-          <b>รายละเอียด:</b> ${m.detail || '-'}
-        `;
-        const marker = L.marker([m.lat, m.lon])
-          .addTo(map)
-          .bindPopup(popupContent)
-          .bindTooltip(m.title || 'No title');
-        markers.push(marker);
-      });
+  fetch('/markers').then(r => r.json()).then(data => {
+    data.forEach(m => {
+      const popupContent = 
+        `<b>${m.title}</b><br>
+        <b>OLC:</b> ${m.olc || '-'}<br>
+        <b>ที่อยู่:</b> ${m.address || '-'}<br>
+        <b>รายละเอียด:</b> ${m.detail || '-'}`;
+      const marker = L.marker([m.lat, m.lon])
+        .addTo(map)
+        .bindPopup(popupContent)
+        .bindTooltip(m.title || 'No title');
+      markers.push(marker);
     });
+  });
+}
+loadMarkers();
+
+var tempMarker;
+var clickedLatLng = null;
+
+// --- แก้ไข onMapClick --- //
+function onMapClick(e) {
+  if (tempMarker) map.removeLayer(tempMarker);
+  tempMarker = L.marker(e.latlng).addTo(map);
+  clickedLatLng = e.latlng;
+
+  // แสดงฟอร์ม popup (div fixed) แทน Leaflet popup
+  showPopupForm();
+
+}
+map.on('click', onMapClick);
+
+// --- ฟังก์ชันแสดง form popup --- //
+function showPopupForm() {
+  document.getElementById('popupForm').style.display = 'block';
+  // เคลียร์ค่าใน form
+  document.getElementById('popupName').value = '';
+  document.getElementById('popupAddress').value = '';
+  document.getElementById('popupDetail').value = '';
+}
+
+// --- ฟังก์ชันซ่อน form popup --- //
+function hidePopupForm() {
+  document.getElementById('popupForm').style.display = 'none';
+  if (tempMarker) {
+    map.removeLayer(tempMarker);
+    tempMarker = null;
+    clickedLatLng = null;
   }
-  loadMarkers();
+}
 
-  // ✅ คลิกบนแผนที่ → เพิ่มหมุดด้วยพิกัด
-  var tempMarker;
-  function onMapClick(e) {
-    if (tempMarker) map.removeLayer(tempMarker);
-    tempMarker = L.marker(e.latlng).addTo(map);
-    tempMarker.bindPopup(`
-      <b>เพิ่มหมุดใหม่</b><br>
-      <input type="text" id="popupName" placeholder="ชื่อสถานที่" /><br>
-      <textarea id="popupAddress" placeholder="ที่อยู่ (ถ้ามี)"></textarea><br>
-      <textarea id="popupDetail" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea><br>
-      <button onclick="savePopupMarker()">บันทึก</button>
-    `).openPopup();
-    window.clickedLatLng = e.latlng;
+// --- เมื่อกดปุ่มบันทึกในฟอร์ม popup --- //
+document.getElementById('savePopupBtn').onclick = async function() {
+  const title = document.getElementById('popupName').value.trim();
+  const address = document.getElementById('popupAddress').value.trim();
+  const detail = document.getElementById('popupDetail').value.trim();
+  if (!title) {
+    alert('กรุณากรอกชื่อสถานที่');
+    return;
   }
-  map.on('click', onMapClick);
+  if (!clickedLatLng) {
+    alert('ตำแหน่งไม่ถูกต้อง');
+    return;
+  }
+  const {lat, lng} = clickedLatLng;
+  const payload = {title, lat, lon: lng, address, detail};
+  const res = await fetch('/add_marker', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const result = await res.json();
+  if (res.ok) {
+    alert('เพิ่มหมุดสำเร็จ');
+    hidePopupForm();
+    loadMarkers();
+  } else {
+    alert('ผิดพลาด: ' + result.error);
+  }
+};
 
-  async function savePopupMarker() {
-    const title = document.getElementById('popupName').value.trim();
-    const address = document.getElementById('popupAddress').value.trim();
-    const detail = document.getElementById('popupDetail').value.trim();
-    if (!title) {
-      alert('กรุณากรอกชื่อสถานที่');
-      return;
-    }
-    const {lat, lng} = window.clickedLatLng;
-    const payload = {title, lat, lon: lng, address, detail};
-    const res = await fetch('/add_marker', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload)
-    });
-    const result = await res.json();
-    if (res.ok) {
-      alert('เพิ่มหมุดสำเร็จ');
-      map.removeLayer(tempMarker);
-      tempMarker = null;
-      loadMarkers();
-    } else {
-      alert('ผิดพลาด: ' + result.error);
-    }
+// --- ปุ่มยกเลิกในฟอร์ม popup --- //
+document.getElementById('cancelPopupBtn').onclick = function() {
+  hidePopupForm();
+};
+
+// --- แก้ไขปุ่ม floatBtn --- //
+document.getElementById("floatBtn").onclick = function() {
+  // ถ้าเปิดฟอร์มอยู่แล้วให้ซ่อนก่อน
+  if (document.getElementById('popupForm').style.display === 'block') {
+    hidePopupForm();
+    return;
   }
 
-  // ✅ กดปุ่มลอย → แสดง popup สำหรับกรอก OLC
-  document.getElementById("floatBtn").onclick = function() {
-    const content = `
-      <b>เพิ่มหมุดจาก OLC</b><br>
-      <input type="text" id="olcInput" placeholder="เช่น 27FP+8JH" /><br>
-      <input type="text" id="titleInput" placeholder="ชื่อสถานที่" /><br>
-      <textarea id="addressInput" placeholder="ที่อยู่ (ถ้ามี)"></textarea><br>
-      <textarea id="detailInput" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea><br>
-      <button onclick="submitOLC()">บันทึก</button>
-    `;
-    const center = map.getCenter();
-    L.popup()
-      .setLatLng(center)
-      .setContent(content)
-      .openOn(map);
-  };
-
-  // ✅ บันทึกข้อมูลหมุดจาก OLC
-  async function submitOLC() {
-    const olc = document.getElementById('olcInput').value.trim();
-    const title = document.getElementById('titleInput').value.trim();
-    const address = document.getElementById('addressInput').value.trim();
-    const detail = document.getElementById('detailInput').value.trim();
-    if (!title || !olc) {
-      alert('กรุณากรอก OLC และชื่อสถานที่');
-      return;
-    }
-    const payload = { title, olc, address, detail };
-    const res = await fetch('/add_marker', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload)
-    });
-    const result = await res.json();
-    if (res.ok) {
-      alert('เพิ่มหมุดสำเร็จ');
-      map.closePopup();
-      loadMarkers();
-    } else {
-      alert('ผิดพลาด: ' + result.error);
-    }
+  // เคลียร์ตำแหน่ง tempMarker ถ้ามี
+  if (tempMarker) {
+    map.removeLayer(tempMarker);
+    tempMarker = null;
   }
-</script>
+  clickedLatLng = null;
 
-</body>
-</html>
+  // แสดงฟอร์ม popup (div fixed) สำหรับเพิ่มหมุดจาก OLC
+  document.getElementById('popupForm').style.display = 'block';
+  document.getElementById('popupName').value = '';
+  document.getElementById('popupAddress').value = '';
+  document.getElementById('popupDetail').value = '';
+
+  // เพิ่มช่องกรอก OLC ในฟอร์มนี้ โดยเราจะใส่ช่อง OLC เพิ่มเติมแบบ prompt
+  // หรือถ้าจะเพิ่มช่องใน div ก็ต้องแก้โครงสร้าง HTML form ด้านบนให้มี input olc ด้วย
+  // แต่ผมแนะนำให้ popupForm นี้ใช้แค่กรอกชื่อ, ที่อยู่, รายละเอียด ส่วน OLC ไว้ทำแยก
+
+  // **ถ้าต้องการให้กรอก OLC ด้วย ให้เพิ่ม input OLC ใน popupForm และแก้ฟังก์ชันบันทึกตามนี้**
+};
