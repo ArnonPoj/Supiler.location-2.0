@@ -51,7 +51,7 @@ def add_marker(lat, lon, title, olc_code=None, address=None, detail=None):
     conn.close()
 
 def decode_olc(code, ref_lat=13.7563, ref_lon=100.5018):
-    plus_code = code.split()[0].strip()
+    plus_code = code.strip().split()[0].upper()
     if not olc.isFull(plus_code):
         recovered = olc.recoverNearest(plus_code, ref_lat, ref_lon)
         decoded = olc.decode(recovered)
