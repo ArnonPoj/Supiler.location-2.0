@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/Openlocationcode.min.js"></script>
   <style>
     html, body {
       margin: 0; padding: 0; height: 100%;
@@ -225,9 +225,9 @@
       try {
         let olcFull = olc;
         if(olc.length < 10){
-          olcFull = openlocationcode.recoverNearest(olc, {lat: 16.4333, lng: 102.8235});
+          olcFull = Openlocationcode.recoverNearest(olc, {lat: 16.4333, lng: 102.8235});
         }
-        const decoded = openlocationcode.decode(olcFull);
+        const decoded = Openlocationcode.decode(olcFull);
         lat = decoded.latitudeCenter;
         lon = decoded.longitudeCenter;
       } catch (err) {
