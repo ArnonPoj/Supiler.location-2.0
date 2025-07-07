@@ -1,83 +1,13 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta charset="UTF-8" />
-  <title>แผนที่ปักหมุด (Leaflet + OLC)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/Openlocationcode.min.js"></script>
-  <style>
-    html, body {
-      margin: 0; padding: 0; height: 100%;
-    }
-    #mapid {
-      height: 100%;
-    }
-    #floatBtn {
-      position: absolute;
-      bottom: 20px; right: 20px;
-      width: 48px; height: 48px;
-      border-radius: 24px;
-      font-size: 28px;
-      background: #007bff;
-      color: white;
-      border: none;
-      cursor: pointer;
-      z-index: 999;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-    }
-    #popupForm {
-      position: absolute;
-      top: 60px; right: 20px;
-      width: 280px;
-      background: white;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      padding: 15px;
-      z-index: 999;
-      display: none;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    }
-    #popupForm input, #popupForm textarea, #popupForm button {
-      width: 100%;
-      margin-bottom: 8px;
-      padding: 6px;
-      box-sizing: border-box;
-      font-size: 14px;
-    }
-    #popupForm h4 {
-      margin-top: 0;
-    }
-  </style>
-</head>
-<body>
-
-<div id="mapid"></div>
-<button id="floatBtn">+</button>
-
-<!-- ฟอร์มปักหมุด -->
-<div id="popupForm">
-  <h4>เพิ่มหมุด</h4>
-  <input type="text" id="popupOLC" placeholder="OLC (ถ้ามี เช่น FQ26+5CC)" />
-  <input type="text" id="popupName" placeholder="ชื่อ Supplier *" />
-  <textarea id="popupDetail" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
-  <button id="savePopupBtn">บันทึก</button>
-  <button id="cancelPopupBtn">ยกเลิก</button>
-</div>
-
+<script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/OpenLocationCode.min.js"></script>
 <script>
-  var map = L.map('mapid').setView([16.4333, 102.8235], 12); // ขอนแก่น
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap contributors'
-  }).addTo(map);
+  // แยก OLC ออกมาเฉพาะรหัส (ตัดข้อความท้าย)
+  function extractOLC(inputText) {
+    if (!inputText) return '';
+    return inputText.trim().split(/\s+/)[0].toUpperCase();
+  }
 
-  var markers = [];
-  var tempMarker = null;
-  var clickedLatLng = null;
+  // ... [เหมือนเดิมถึง loadMarkers()]
 
-  // โหลดหมุดทั้งหมดจาก backend
   function loadMarkers() {
     markers.forEach(m => map.removeLayer(m));
     markers = [];
@@ -86,9 +16,8 @@
       .then(res => res.json())
       .then(data => {
         data.forEach(m => {
-          // แปลง OLC ให้เป็นที่อยู่ (ใช้ decode เพื่อคำนวณพื้นที่ แต่แสดงข้อความ OLC)
           let olcText = m.olc || '-';
-          if(m.olc){
+          if (m.olc) {
             olcText += " " + (m.address || "");
           }
 
@@ -107,11 +36,9 @@
       });
   }
 
-  loadMarkers();
+  // ... [เหมือนเดิมถึง showMarkerPopup()]
 
-  // ฟังก์ชันแสดง popup ของ Leaflet สำหรับกรอกข้อมูลที่หมุดที่คลิก
   function showMarkerPopup(marker) {
-    // กำหนดเนื้อหา popup แบบฟอร์ม (HTML) ให้กรอกข้อมูล
     const formHtml = `
       <div style="min-width:220px;">
         <label><b>ชื่อ Supplier *</b></label>
@@ -126,11 +53,10 @@
 
     marker.bindPopup(formHtml).openPopup();
 
-    // รอให้ DOM โหลด แล้วผูก event ปุ่มบันทึก
     setTimeout(() => {
-      document.getElementById('saveMarkerBtn').onclick = async function() {
+      document.getElementById('saveMarkerBtn').onclick = async function () {
         const title = document.getElementById('popupNameMarker').value.trim();
-        const olc = document.getElementById('popupOLCMarker').value.trim();
+        const olcRaw = document.getElementById('popupOLCMarker').value.trim();
         const detail = document.getElementById('popupDetailMarker').value.trim();
 
         if (!title) {
@@ -138,21 +64,19 @@
           return;
         }
 
-        // พิกัดจากหมุดนี้
         const lat = marker.getLatLng().lat;
         const lon = marker.getLatLng().lng;
 
-        // ถ้ามี OLC ให้ลองถอดรหัส ถ้าไม่ใส่ OLC ก็ไม่ต้องถอด
-        let olcFull = olc;
-        if(olc){
+        let olcCode = extractOLC(olcRaw);
+        let olcFull = olcCode;
+
+        if (olcCode) {
           try {
-            if(olc.length < 10){
-              // ใช้ recoverNearest โดยอิงพิกัดหมุดนี้
-              olcFull = openlocationcode.recoverNearest(olc, {lat, lng: lon});
+            if (!OpenLocationCode.isFull(olcCode)) {
+              olcFull = OpenLocationCode.recoverNearest(olcCode, { lat, lng: lon });
             }
-            // เช็คว่าถอดได้ไหม
-            openlocationcode.decode(olcFull);
-          } catch(e){
+            OpenLocationCode.decode(olcFull);
+          } catch (e) {
             alert('ไม่สามารถถอดรหัส OLC ได้');
             return;
           }
@@ -163,9 +87,10 @@
         try {
           const res = await fetch('/add_marker', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
           });
+
           const result = await res.json();
           if (res.ok) {
             alert('เพิ่มหมุดสำเร็จ');
@@ -174,43 +99,16 @@
           } else {
             alert('ผิดพลาด: ' + result.error);
           }
-        } catch(err) {
+        } catch (err) {
           alert('เกิดข้อผิดพลาดเชื่อมต่อ');
         }
       };
     }, 300);
   }
 
-  // เมื่อคลิกบนแผนที่
-  function onMapClick(e) {
-    if (tempMarker) map.removeLayer(tempMarker);
-    tempMarker = L.marker(e.latlng).addTo(map);
-    clickedLatLng = e.latlng;
-
-    // แสดงฟอร์ม popup ของ Leaflet ที่หมุด
-    showMarkerPopup(tempMarker);
-  }
-  map.on('click', onMapClick);
-
-  // ฟอร์มปกติที่ขวาบน (เหมือนเดิม)
-  function showPopupForm() {
-    document.getElementById('popupForm').style.display = 'block';
-    document.getElementById('popupOLC').value = '';
-    document.getElementById('popupName').value = '';
-    document.getElementById('popupDetail').value = '';
-  }
-  function hidePopupForm() {
-    document.getElementById('popupForm').style.display = 'none';
-    if (tempMarker) {
-      map.removeLayer(tempMarker);
-      tempMarker = null;
-      clickedLatLng = null;
-    }
-  }
-
-  // บันทึกจากฟอร์มขวาบน
+  // ฟอร์มขวาบน
   document.getElementById('savePopupBtn').onclick = async function () {
-    const olc = document.getElementById('popupOLC').value.trim();
+    const olcRaw = document.getElementById('popupOLC').value.trim();
     const title = document.getElementById('popupName').value.trim();
     const detail = document.getElementById('popupDetail').value.trim();
 
@@ -220,14 +118,15 @@
     }
 
     let lat, lon;
+    let olcCode = extractOLC(olcRaw);
+    let olcFull = olcCode;
 
-    if (olc) {
+    if (olcCode) {
       try {
-        let olcFull = olc;
-        if(olc.length < 10){
-          olcFull = Openlocationcode.recoverNearest(olc, {lat: 16.4333, lng: 102.8235});
+        if (!OpenLocationCode.isFull(olcCode)) {
+          olcFull = OpenLocationCode.recoverNearest(olcCode, { lat: 16.4333, lng: 102.8235 });
         }
-        const decoded = Openlocationcode.decode(olcFull);
+        const decoded = OpenLocationCode.decode(olcFull);
         lat = decoded.latitudeCenter;
         lon = decoded.longitudeCenter;
       } catch (err) {
@@ -242,7 +141,7 @@
       return;
     }
 
-    const payload = { title, lat, lon, olc, detail };
+    const payload = { title, lat, lon, olc: olcFull, detail };
 
     try {
       const res = await fetch('/add_marker', {
@@ -264,26 +163,4 @@
       alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
     }
   };
-
-  // ปุ่มยกเลิกฟอร์ม
-  document.getElementById('cancelPopupBtn').onclick = function () {
-    hidePopupForm();
-  };
-
-  // ปุ่มลอย +
-  document.getElementById('floatBtn').onclick = function () {
-    if (document.getElementById('popupForm').style.display === 'block') {
-      hidePopupForm();
-    } else {
-      if (tempMarker) {
-        map.removeLayer(tempMarker);
-        tempMarker = null;
-      }
-      clickedLatLng = null;
-      showPopupForm();
-    }
-  };
 </script>
-
-</body>
-</html>
