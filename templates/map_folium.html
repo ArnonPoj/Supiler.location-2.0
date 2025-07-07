@@ -2,33 +2,20 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
-  <title>แผนที่ปักหมุด 2 แบบ พร้อมข้อมูล OLC</title>
+  <title>แผนที่ปักหมุด (Leaflet + OLC)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.min.js"></script>
   <style>
-    body, html {
-      height: 100%;
+    html, body {
       margin: 0;
       padding: 0;
-      font-family: Arial, sans-serif;
-    }
-    #container {
-      display: flex;
-      height: 100vh;
+      height: 100%;
     }
     #mapid {
-      flex-grow: 1;
+      height: 100%;
     }
-
-    input, button, textarea {
-      width: 100%;
-      margin-bottom: 8px;
-      padding: 8px;
-      font-size: 14px;
-      box-sizing: border-box;
-    }
-    textarea {
-      resize: vertical;
-    }
-
     #floatBtn {
       position: absolute;
       bottom: 20px;
@@ -44,44 +31,40 @@
       z-index: 999;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
-
-    .popup-form {
+    #popupForm {
       position: absolute;
-      top: 50px;
+      top: 60px;
       right: 20px;
-      width: 300px;
+      width: 280px;
       background: white;
       border: 1px solid #ccc;
+      border-radius: 8px;
       padding: 15px;
-      z-index: 1000;
+      z-index: 999;
       display: none;
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
-
-    .popup-form h3 {
+    #popupForm input, #popupForm textarea, #popupForm button {
+      width: 100%;
+      margin-bottom: 8px;
+      padding: 6px;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+    #popupForm h4 {
       margin-top: 0;
     }
-
-    .popup-form button {
-      margin-top: 5px;
-    }
   </style>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.4/openlocationcode.min.js"></script>
 </head>
 <body>
 
-<div id="container">
-  <div id="mapid"></div>
-</div>
-
-<!-- ✅ ปุ่มลอย -->
+<div id="mapid"></div>
 <button id="floatBtn">+</button>
 
-<!-- ✅ ฟอร์มเพิ่มหมุดแบบคลิก -->
-<div class="popup-form" id="popupForm">
-  <h3>เพิ่มหมุดใหม่</h3>
+<!-- ✅ ฟอร์มปักหมุด -->
+<div id="popupForm">
+  <h4>เพิ่มหมุด</h4>
+  <input type="text" id="popupOLC" placeholder="OLC (ถ้ามี เช่น 7P4M+62)" />
   <input type="text" id="popupName" placeholder="ชื่อสถานที่" />
   <textarea id="popupAddress" placeholder="ที่อยู่ (ถ้ามี)"></textarea>
   <textarea id="popupDetail" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
@@ -89,66 +72,62 @@
   <button id="cancelPopupBtn">ยกเลิก</button>
 </div>
 
-<!-- ✅ ฟอร์มเพิ่มหมุดจาก OLC -->
-<div class="popup-form" id="olcForm">
-  <h3>เพิ่มหมุดจาก OLC</h3>
-  <input type="text" id="olcInput" placeholder="รหัส OLC เช่น 7P3F+26" />
-  <input type="text" id="titleInput" placeholder="ชื่อสถานที่" />
-  <textarea id="addressInput" placeholder="ที่อยู่ (ถ้ามี)"></textarea>
-  <textarea id="detailInput" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)"></textarea>
-  <button onclick="submitOLC()">บันทึก</button>
-  <button onclick="document.getElementById('olcForm').style.display='none'">ยกเลิก</button>
-</div>
-
 <script>
   var map = L.map('mapid').setView([13.7563, 100.5018], 12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
-    attribution: '© OpenStreetMap'
+    attribution: '© OpenStreetMap contributors'
   }).addTo(map);
 
   var markers = [];
+  var tempMarker = null;
+  var clickedLatLng = null;
 
+  // 1️⃣ โหลดหมุดทั้งหมด
   function loadMarkers() {
     markers.forEach(m => map.removeLayer(m));
     markers = [];
 
-    fetch('/markers').then(r => r.json()).then(data => {
-      data.forEach(m => {
-        const popupContent = `
-          <b>${m.title}</b><br>
-          <b>OLC:</b> ${m.olc || '-'}<br>
-          <b>ที่อยู่:</b> ${m.address || '-'}<br>
-          <b>รายละเอียด:</b> ${m.detail || '-'}`;
-        const marker = L.marker([m.lat, m.lon])
-          .addTo(map)
-          .bindPopup(popupContent)
-          .bindTooltip(m.title || 'No title');
-        markers.push(marker);
+    fetch('/markers')
+      .then(res => res.json())
+      .then(data => {
+        data.forEach(m => {
+          const content = `
+            <b>${m.title}</b><br>
+            <b>OLC:</b> ${m.olc || '-'}<br>
+            <b>ที่อยู่:</b> ${m.address || '-'}<br>
+            <b>รายละเอียด:</b> ${m.detail || '-'}`;
+          const marker = L.marker([m.lat, m.lon])
+            .addTo(map)
+            .bindPopup(content)
+            .bindTooltip(m.title || 'No title');
+          markers.push(marker);
+        });
       });
-    });
   }
+
   loadMarkers();
 
-  var tempMarker;
-  var clickedLatLng = null;
-
+  // 2️⃣ คลิกบนแผนที่เพื่อปักหมุด
   function onMapClick(e) {
-    hidePopupForm();
     if (tempMarker) map.removeLayer(tempMarker);
     tempMarker = L.marker(e.latlng).addTo(map);
     clickedLatLng = e.latlng;
     showPopupForm();
   }
+
   map.on('click', onMapClick);
 
+  // 3️⃣ แสดงฟอร์มกรอกข้อมูล
   function showPopupForm() {
     document.getElementById('popupForm').style.display = 'block';
+    document.getElementById('popupOLC').value = '';
     document.getElementById('popupName').value = '';
     document.getElementById('popupAddress').value = '';
     document.getElementById('popupDetail').value = '';
   }
 
+  // 4️⃣ ซ่อนฟอร์มและลบหมุดชั่วคราว
   function hidePopupForm() {
     document.getElementById('popupForm').style.display = 'none';
     if (tempMarker) {
@@ -158,22 +137,48 @@
     clickedLatLng = null;
   }
 
-  document.getElementById('savePopupBtn').onclick = async function() {
+  // 5️⃣ ปุ่ม "บันทึก"
+  document.getElementById('savePopupBtn').onclick = async function () {
+    const olc = document.getElementById('popupOLC').value.trim();
     const title = document.getElementById('popupName').value.trim();
     const address = document.getElementById('popupAddress').value.trim();
     const detail = document.getElementById('popupDetail').value.trim();
-    if (!title || !clickedLatLng) {
-      alert('กรุณากรอกชื่อและเลือกตำแหน่ง');
+
+    if (!title) {
+      alert('กรุณากรอกชื่อสถานที่');
       return;
     }
-    const { lat, lng } = clickedLatLng;
-    const payload = { title, lat, lon: lng, address, detail };
+
+    let lat, lon;
+
+    // ถ้ามี OLC → decode
+    if (olc) {
+      try {
+        const decoded = openlocationcode.decode(olc);
+        lat = decoded.latitudeCenter;
+        lon = decoded.longitudeCenter;
+      } catch (err) {
+        alert('ไม่สามารถถอดรหัส OLC ได้');
+        return;
+      }
+    } else if (clickedLatLng) {
+      lat = clickedLatLng.lat;
+      lon = clickedLatLng.lng;
+    } else {
+      alert('กรุณาคลิกบนแผนที่หรือกรอก OLC');
+      return;
+    }
+
+    const payload = { title, lat, lon, olc, address, detail };
+
     const res = await fetch('/add_marker', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+
     const result = await res.json();
+
     if (res.ok) {
       alert('เพิ่มหมุดสำเร็จ');
       hidePopupForm();
@@ -183,51 +188,24 @@
     }
   };
 
-  document.getElementById('cancelPopupBtn').onclick = function() {
+  // 6️⃣ ปุ่มยกเลิก
+  document.getElementById('cancelPopupBtn').onclick = function () {
     hidePopupForm();
   };
 
-  document.getElementById("floatBtn").onclick = function() {
-    hidePopupForm();
-    document.getElementById('olcForm').style.display = 'block';
-    document.getElementById('olcInput').value = '';
-    document.getElementById('titleInput').value = '';
-    document.getElementById('addressInput').value = '';
-    document.getElementById('detailInput').value = '';
-  };
-
-  async function submitOLC() {
-    const olc = document.getElementById('olcInput').value.trim();
-    const title = document.getElementById('titleInput').value.trim();
-    const address = document.getElementById('addressInput').value.trim();
-    const detail = document.getElementById('detailInput').value.trim();
-    if (!olc || !title) {
-      alert("กรุณากรอก OLC และชื่อสถานที่");
-      return;
-    }
-
-    try {
-      const decoded = OpenLocationCode.decode(olc);
-      const lat = decoded.latitudeCenter;
-      const lon = decoded.longitudeCenter;
-      const payload = { title, olc, lat, lon, address, detail };
-      const res = await fetch('/add_marker', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const result = await res.json();
-      if (res.ok) {
-        alert('เพิ่มหมุดสำเร็จ');
-        document.getElementById('olcForm').style.display = 'none';
-        loadMarkers();
-      } else {
-        alert('ผิดพลาด: ' + result.error);
+  // 7️⃣ ปุ่ม + ลอย
+  document.getElementById('floatBtn').onclick = function () {
+    if (document.getElementById('popupForm').style.display === 'block') {
+      hidePopupForm();
+    } else {
+      if (tempMarker) {
+        map.removeLayer(tempMarker);
+        tempMarker = null;
       }
-    } catch (err) {
-      alert("ไม่สามารถถอดรหัส OLC ได้: " + err);
+      clickedLatLng = null;
+      showPopupForm();
     }
-  }
+  };
 </script>
 
 </body>
