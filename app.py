@@ -111,7 +111,6 @@ def add_marker_api():
     olc_code = data.get('olc', '').strip() or None
     address = data.get('address', '').strip() or None
     detail = data.get('detail', '').strip() or None
-
     lat = data.get('lat')
     lon = data.get('lon')
 
