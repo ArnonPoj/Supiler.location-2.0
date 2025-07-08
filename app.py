@@ -17,18 +17,17 @@ def get_conn():
 def init_db():
     conn = get_conn()
     c = conn.cursor()
-    # สร้างตารางถ้ายังไม่มี
     c.execute('''
         CREATE TABLE IF NOT EXISTS markers (
             id SERIAL PRIMARY KEY,
             lat DOUBLE PRECISION NOT NULL,
             lon DOUBLE PRECISION NOT NULL,
-            title TEXT NOT NULL
+            title TEXT NOT NULL,
+            olc TEXT,
+            address TEXT,
+            detail TEXT
         )
     ''')
-    c.execute("ALTER TABLE markers ADD COLUMN IF NOT EXISTS olc TEXT;")
-    c.execute("ALTER TABLE markers ADD COLUMN IF NOT EXISTS address TEXT;")
-    c.execute("ALTER TABLE markers ADD COLUMN IF NOT EXISTS detail TEXT;")
     conn.commit()
     conn.close()
 
@@ -109,23 +108,26 @@ def index():
 def add_marker_api():
     data = request.json
     title = data.get('title')
-    lat = data.get('lat')
-    lon = data.get('lon')
     olc_code = data.get('olc', '').strip() or None
     address = data.get('address', '').strip() or None
     detail = data.get('detail', '').strip() or None
 
-    if olc_code:
-        try:
-            lat, lon = decode_olc(olc_code)
-        except Exception as e:
-            return {"error": f"OLC ไม่ถูกต้อง: {str(e)}"}, 400
-    else:
+    lat = data.get('lat')
+    lon = data.get('lon')
+
+    if lat is not None and lon is not None:
         try:
             lat = float(lat)
             lon = float(lon)
         except:
             return {"error": "พิกัดละติจูดลองจิจูดไม่ถูกต้อง"}, 400
+    elif olc_code:
+        try:
+            lat, lon = decode_olc(olc_code)
+        except Exception as e:
+            return {"error": f"OLC ไม่ถูกต้อง: {str(e)}"}, 400
+    else:
+        return {"error": "ต้องระบุพิกัดหรือ OLC อย่างใดอย่างหนึ่ง"}, 400
 
     if not title:
         return {"error": "กรุณากรอกชื่อสถานที่"}, 400
