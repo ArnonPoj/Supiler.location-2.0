@@ -68,6 +68,8 @@
   <b>เพิ่มหมุดใหม่</b><br>
   <input type="text" id="popupName" placeholder="ชื่อสถานที่" /><br>
   <input type="text" id="popupOLC" placeholder="OLC (เช่น 7P52VV6Q+J4)" /><br>
+  <input type="number" id="popupLat" placeholder="ละติจูด (latitude)" step="any" /><br>
+  <input type="number" id="popupLon" placeholder="ลองจิจูด (longitude)" step="any" /><br>
   <textarea id="popupAddress" placeholder="ที่อยู่ (ถ้ามี)" rows="2"></textarea><br>
   <textarea id="popupDetail" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)" rows="3"></textarea><br>
   <button id="savePopupBtn">บันทึก</button>
@@ -82,46 +84,51 @@
   }).addTo(map);
 
   var markers = [];
+  var tempMarker;
+  var clickedLatLng = null;
 
   function loadMarkers() {
     markers.forEach(m => map.removeLayer(m));
-    markers = [];
-
-    fetch('/markers').then(r => r.json()).then(data => {
-      data.forEach(m => {
-        const popupContent = 
-          <b>${m.title}</b><br>
-          <b>OLC:</b> ${m.olc || '-'}<br>
-          <b>ที่อยู่:</b> ${m.address || '-'}<br>
-          <b>รายละเอียด:</b> ${m.detail || '-'}
-        ;
-        const marker = L.marker([m.lat, m.lon])
-          .addTo(map)
-          .bindPopup(popupContent)
-          .bindTooltip(m.title || 'No title');
-        markers.push(marker);
-      });
-    });
-  }
-  loadMarkers();
-
-  function showPopupForm() {
+@@ -113,89 +109,57 @@
     document.getElementById('popupForm').style.display = 'block';
     document.getElementById('popupName').value = '';
     document.getElementById('popupOLC').value = '';
+    document.getElementById('popupLat').value = '';
+    document.getElementById('popupLon').value = '';
     document.getElementById('popupAddress').value = '';
     document.getElementById('popupDetail').value = '';
   }
 
   function hidePopupForm() {
     document.getElementById('popupForm').style.display = 'none';
+    if (tempMarker) {
+      map.removeLayer(tempMarker);
+      tempMarker = null;
+      clickedLatLng = null;
+    }
   }
+
+  map.on('click', function(e) {
+    if (tempMarker) map.removeLayer(tempMarker);
+    tempMarker = L.marker(e.latlng).addTo(map);
+    clickedLatLng = e.latlng;
+    showPopupForm();
+
+    // ซ่อน lat/lon เมื่อคลิกแผนที่ (จะใช้ค่าจากจุดคลิกแทน)
+    document.getElementById('popupLat').value = '';
+    document.getElementById('popupLon').value = '';
+  });
 
   document.getElementById("floatBtn").onclick = function() {
     if (document.getElementById('popupForm').style.display === 'block') {
       hidePopupForm();
       return;
     }
+    if (tempMarker) {
+      map.removeLayer(tempMarker);
+      tempMarker = null;
+    }
+    clickedLatLng = null;
     showPopupForm();
   };
 
@@ -130,16 +137,29 @@
     const olc = document.getElementById('popupOLC').value.trim();
     const address = document.getElementById('popupAddress').value.trim();
     const detail = document.getElementById('popupDetail').value.trim();
+    let lat, lon;
 
     if (!title) {
       alert('กรุณากรอกชื่อสถานที่');
       return;
     }
+
+    if (clickedLatLng) {
+      lat = clickedLatLng.lat;
+      lon = clickedLatLng.lng;
+    } else {
+      lat = parseFloat(document.getElementById('popupLat').value);
+      lon = parseFloat(document.getElementById('popupLon').value);
+      if (isNaN(lat) || isNaN(lon)) {
+        alert('กรุณากรอกละติจูด/ลองจิจูดให้ถูกต้อง');
+        return;
+      }
     if (!olc) {
       alert('กรุณากรอก OLC (Plus Code)');
       return;
     }
 
+    const payload = { title, olc, lat, lon, address, detail };
     const payload = { title, olc, address, detail };
     const res = await fetch('/add_marker', {
       method: 'POST',
