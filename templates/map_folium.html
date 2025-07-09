@@ -1,158 +1,164 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <title>แผนที่ปักหมุด (Folium)</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        html, body {
-            height: 100%;
-            margin: 0;
-        }
-
-        #map-container {
-            height: 100vh;
-            width: 100%;
-        }
-
-        .floating-btn {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            z-index: 999;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 12px 18px;
-            font-size: 20px;
-            border-radius: 50%;
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-        }
-
-        /* Modal Styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1001;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.5);
-        }
-
-        .modal-content {
-            background-color: #fefefe;
-            margin: 10% auto;
-            padding: 20px;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 400px;
-        }
-
-        .modal-content input, .modal-content textarea {
-            width: 100%;
-            margin-top: 10px;
-            padding: 8px;
-        }
-
-        .modal-content button {
-            margin-top: 15px;
-            padding: 10px 15px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-
-        .close {
-            float: right;
-            font-size: 28px;
-            cursor: pointer;
-        }
-
-        .error {
-            color: red;
-            margin-top: 10px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <title>แผนที่ปักหมุดแบบ Folium + Leaflet</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    #mapid {
+      height: 100%;
+    }
+    #floatBtn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 48px;
+      height: 48px;
+      border-radius: 24px;
+      font-size: 28px;
+      background: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      z-index: 999;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    #popupForm {
+      display: none;
+      position: fixed;
+      bottom: 80px;
+      right: 20px;
+      background: white;
+      padding: 15px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      border-radius: 8px;
+      width: 280px;
+      z-index: 1000;
+    }
+    #popupForm input,
+    #popupForm textarea,
+    #popupForm button {
+      width: 100%;
+      margin-bottom: 8px;
+      padding: 8px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    #popupForm textarea {
+      resize: vertical;
+    }
+    #popupForm button#cancelPopupBtn {
+      background: #ccc;
+    }
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
 </head>
 <body>
 
-<div id="map-container">
-    {{ map_html|safe }}
-    <button class="floating-btn" onclick="openForm()">+</button>
-</div>
+<div id="mapid"></div>
+<button id="floatBtn">+</button>
 
-<!-- Modal Form -->
-<div id="markerModal" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeForm()">&times;</span>
-        <h3>เพิ่มหมุดใหม่</h3>
-        <input type="text" id="title" placeholder="ชื่อสถานที่" required />
-        <input type="text" id="olc" placeholder="OLC (เช่น 7P52V722+56)" />
-        <textarea id="address" rows="2" placeholder="ที่อยู่"></textarea>
-        <textarea id="detail" rows="2" placeholder="รายละเอียดเพิ่มเติม"></textarea>
-        <button onclick="submitMarker()">บันทึก</button>
-        <div class="error" id="error"></div>
-    </div>
+<!-- ✅ Form ป้อนข้อมูลหมุดแบบ popup -->
+<div id="popupForm">
+  <b>เพิ่มหมุดใหม่</b><br>
+  <input type="text" id="popupName" placeholder="ชื่อสถานที่" /><br>
+  <input type="text" id="popupOLC" placeholder="OLC (เช่น 7P52VV6Q+J4)" /><br>
+  <textarea id="popupAddress" placeholder="ที่อยู่ (ถ้ามี)" rows="2"></textarea><br>
+  <textarea id="popupDetail" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)" rows="3"></textarea><br>
+  <button id="savePopupBtn">บันทึก</button>
+  <button id="cancelPopupBtn">ยกเลิก</button>
 </div>
 
 <script>
-    function openForm() {
-        document.getElementById('markerModal').style.display = 'block';
+  var map = L.map('mapid').setView([13.7563, 100.5018], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  var markers = [];
+
+  function loadMarkers() {
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+
+    fetch('/markers').then(r => r.json()).then(data => {
+      data.forEach(m => {
+        const popupContent = `
+          <b>${m.title}</b><br>
+          <b>OLC:</b> ${m.olc || '-'}<br>
+          <b>ที่อยู่:</b> ${m.address || '-'}<br>
+          <b>รายละเอียด:</b> ${m.detail || '-'}
+        `;
+        const marker = L.marker([m.lat, m.lon])
+          .addTo(map)
+          .bindPopup(popupContent)
+          .bindTooltip(m.title || 'No title');
+        markers.push(marker);
+      });
+    });
+  }
+  loadMarkers();
+
+  function showPopupForm() {
+    document.getElementById('popupForm').style.display = 'block';
+    document.getElementById('popupName').value = '';
+    document.getElementById('popupOLC').value = '';
+    document.getElementById('popupAddress').value = '';
+    document.getElementById('popupDetail').value = '';
+  }
+
+  function hidePopupForm() {
+    document.getElementById('popupForm').style.display = 'none';
+  }
+
+  document.getElementById("floatBtn").onclick = function() {
+    if (document.getElementById('popupForm').style.display === 'block') {
+      hidePopupForm();
+      return;
+    }
+    showPopupForm();
+  };
+
+  document.getElementById('savePopupBtn').onclick = async function() {
+    const title = document.getElementById('popupName').value.trim();
+    const olc = document.getElementById('popupOLC').value.trim();
+    const address = document.getElementById('popupAddress').value.trim();
+    const detail = document.getElementById('popupDetail').value.trim();
+
+    if (!title) {
+      alert('กรุณากรอกชื่อสถานที่');
+      return;
+    }
+    if (!olc) {
+      alert('กรุณากรอก OLC (Plus Code)');
+      return;
     }
 
-    function closeForm() {
-        document.getElementById('markerModal').style.display = 'none';
-        document.getElementById('error').innerText = '';
+    const payload = { title, olc, address, detail };
+    const res = await fetch('/add_marker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (res.ok) {
+      alert('เพิ่มหมุดสำเร็จ');
+      hidePopupForm();
+      loadMarkers();
+    } else {
+      alert('ผิดพลาด: ' + result.error);
     }
+  };
 
-    function submitMarker() {
-        const title = document.getElementById('title').value.trim();
-        const olc = document.getElementById('olc').value.trim();
-        const address = document.getElementById('address').value.trim();
-        const detail = document.getElementById('detail').value.trim();
-
-        if (!title) {
-            document.getElementById('error').innerText = 'กรุณากรอกชื่อสถานที่';
-            return;
-        }
-
-        fetch('/add_marker', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                title: title,
-                olc: olc,
-                address: address,
-                detail: detail
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.message) {
-                location.reload();
-            } else {
-                document.getElementById('error').innerText = data.error || 'เกิดข้อผิดพลาด';
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            document.getElementById('error').innerText = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์';
-        });
-    }
-
-    window.onclick = function(event) {
-        const modal = document.getElementById('markerModal');
-        if (event.target === modal) {
-            closeForm();
-        }
-    }
+  document.getElementById('cancelPopupBtn').onclick = function() {
+    hidePopupForm();
+  };
 </script>
 
 </body>
