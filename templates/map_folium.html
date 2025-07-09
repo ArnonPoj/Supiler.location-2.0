@@ -89,7 +89,27 @@
 
   function loadMarkers() {
     markers.forEach(m => map.removeLayer(m));
-@@ -113,89 +109,57 @@
+    markers = [];
+
+    fetch('/markers').then(r => r.json()).then(data => {
+      data.forEach(m => {
+        const popupContent = `
+          <b>${m.title}</b><br>
+          <b>OLC:</b> ${m.olc || '-'}<br>
+          <b>ที่อยู่:</b> ${m.address || '-'}<br>
+          <b>รายละเอียด:</b> ${m.detail || '-'}
+        `;
+        const marker = L.marker([m.lat, m.lon])
+          .addTo(map)
+          .bindPopup(popupContent)
+          .bindTooltip(m.title || 'No title');
+        markers.push(marker);
+      });
+    });
+  }
+  loadMarkers();
+
+  function showPopupForm() {
     document.getElementById('popupForm').style.display = 'block';
     document.getElementById('popupName').value = '';
     document.getElementById('popupOLC').value = '';
@@ -154,13 +174,9 @@
         alert('กรุณากรอกละติจูด/ลองจิจูดให้ถูกต้อง');
         return;
       }
-    if (!olc) {
-      alert('กรุณากรอก OLC (Plus Code)');
-      return;
     }
 
     const payload = { title, olc, lat, lon, address, detail };
-    const payload = { title, olc, address, detail };
     const res = await fetch('/add_marker', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
