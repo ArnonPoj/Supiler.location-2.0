@@ -93,13 +93,14 @@ def index():
     m = folium.Map(location=[start_lat, start_lon], zoom_start=12)
 
     for mkr in markers:
-        _, lat, lon, title, olc_code, address, detail = mkr
+        id, lat, lon, title, olc_code, address, detail = mkr
         popup_html = f"""
-        <div style="min-width:200px;">
+        <div style=\"min-width:200px;\">
             <b>{title}</b><br>
             <b>OLC:</b> {olc_code or '-'}<br>
             <b>ที่อยู่:</b> {address or '-'}<br>
-            <b>รายละเอียด:</b> {detail or '-'}
+            <b>รายละเอียด:</b> {detail or '-'}<br>
+            <button onclick=\"deleteMarker({id})\" style=\"color:red;\">🗑 ลบหมุด</button>
         </div>
         """
         folium.Marker(
@@ -126,14 +127,14 @@ def add_marker_api():
             lat = float(lat)
             lon = float(lon)
         except:
-            return {"error": "พิกัดละติจูดลองจิจูดไม่ถูกต้อง"}, 400
+            return {"error": "พิกัดละติจูเลงจิจูดไม่ถูกต้อง"}, 400
     elif olc_code:
         try:
             lat, lon = decode_olc(olc_code)
         except Exception as e:
             return {"error": f"OLC ไม่ถูกต้อง: {str(e)}"}, 400
     else:
-        return {"error": "ต้องระบุพิกัดหรือ OLC อย่างใดอย่างหนึ่ง"}, 400
+        return {"error": "ต้องระบุพิกัดหรือ OLC อย่างใดอย่หนึ่ง"}, 400
 
     if not title:
         return {"error": "กรุณากรอกชื่อสถานที่"}, 400
