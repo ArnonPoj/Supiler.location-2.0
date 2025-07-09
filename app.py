@@ -49,6 +49,13 @@ def add_marker(lat, lon, title, olc_code=None, address=None, detail=None):
     conn.commit()
     conn.close()
 
+def delete_marker(marker_id):
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("DELETE FROM markers WHERE id = %s", (marker_id,))
+    conn.commit()
+    conn.close()
+
 def decode_olc(code, ref_lat=13.7563, ref_lon=100.5018):
     plus_code = code.split()[0].strip()
     if not olc.isFull(plus_code):
@@ -133,6 +140,14 @@ def add_marker_api():
 
     add_marker(lat, lon, title, olc_code, address, detail)
     return {"message": "เพิ่มหมุดสำเร็จ"}, 200
+
+@app.route('/delete_marker/<int:marker_id>', methods=['DELETE'])
+def delete_marker_api(marker_id):
+    try:
+        delete_marker(marker_id)
+        return jsonify({"message": "ลบหมุดสำเร็จ"}), 200
+    except Exception as e:
+        return jsonify({"error": f"ไม่สามารถลบหมุดได้: {str(e)}"}), 500
 
 if __name__ == '__main__':
     init_db()
