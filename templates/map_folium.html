@@ -57,6 +57,7 @@
   </style>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/open-location-code@1.0.3/openlocationcode.min.js"></script>
 </head>
 <body>
 
@@ -65,13 +66,15 @@
 
 <!-- ✅ Form ป้อนข้อมูลหมุดแบบ popup -->
 <div id="popupForm">
-  <b>เพิ่มหมุดใหม่</b><br>
-  <input type="text" id="popupName" placeholder="ชื่อสถานที่" /><br>
-  <input type="text" id="popupOLC" placeholder="OLC (เช่น 7P52VV6Q+J4)" /><br>
-  <textarea id="popupAddress" placeholder="ที่อยู่ (ถ้ามี)" rows="2"></textarea><br>
-  <textarea id="popupDetail" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)" rows="3"></textarea><br>
-  <button id="savePopupBtn">บันทึก</button>
-  <button id="cancelPopupBtn">ยกเลิก</button>
+  <form id="popupMarkerForm">
+    <b>เพิ่มหมุดใหม่</b><br>
+    <input type="text" id="popupName" placeholder="ชื่อสถานที่" required /><br>
+    <input type="text" id="popupOLC" placeholder="OLC (เช่น 7P52VV6Q+J4)" required /><br>
+    <textarea id="popupAddress" placeholder="ที่อยู่ (ถ้ามี)" rows="2"></textarea><br>
+    <textarea id="popupDetail" placeholder="รายละเอียดเพิ่มเติม (ถ้ามี)" rows="3"></textarea><br>
+    <button type="submit" id="savePopupBtn">บันทึก</button>
+    <button type="button" id="cancelPopupBtn">ยกเลิก</button>
+  </form>
 </div>
 
 <script>
@@ -107,10 +110,7 @@
 
   function showPopupForm() {
     document.getElementById('popupForm').style.display = 'block';
-    document.getElementById('popupName').value = '';
-    document.getElementById('popupOLC').value = '';
-    document.getElementById('popupAddress').value = '';
-    document.getElementById('popupDetail').value = '';
+    document.getElementById('popupMarkerForm').reset();
   }
 
   function hidePopupForm() {
@@ -118,41 +118,57 @@
   }
 
   document.getElementById("floatBtn").onclick = function() {
-    if (document.getElementById('popupForm').style.display === 'block') {
+    const form = document.getElementById('popupForm');
+    if (form.style.display === 'block') {
       hidePopupForm();
-      return;
+    } else {
+      showPopupForm();
     }
-    showPopupForm();
   };
 
-  document.getElementById('savePopupBtn').onclick = async function() {
+  document.getElementById('popupMarkerForm').onsubmit = async function (e) {
+    e.preventDefault();  // หยุดการ reload หน้า
+
+    const saveBtn = document.getElementById('savePopupBtn');
+    saveBtn.disabled = true;
+
     const title = document.getElementById('popupName').value.trim();
     const olc = document.getElementById('popupOLC').value.trim();
     const address = document.getElementById('popupAddress').value.trim();
     const detail = document.getElementById('popupDetail').value.trim();
 
-    if (!title) {
-      alert('กรุณากรอกชื่อสถานที่');
-      return;
-    }
-    if (!olc) {
-      alert('กรุณากรอก OLC (Plus Code)');
+    if (!OpenLocationCode.isValid(olc)) {
+      alert('OLC ไม่ถูกต้อง');
+      saveBtn.disabled = false;
       return;
     }
 
-    const payload = { title, olc, address, detail };
-    const res = await fetch('/add_marker', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const result = await res.json();
-    if (res.ok) {
-      alert('เพิ่มหมุดสำเร็จ');
-      hidePopupForm();
-      loadMarkers();
-    } else {
-      alert('ผิดพลาด: ' + result.error);
+    const decoded = OpenLocationCode.decode(olc);
+    const lat = decoded.latitudeCenter;
+    const lon = decoded.longitudeCenter;
+
+    const payload = { title, olc, address, detail, lat, lon };
+
+    try {
+      const res = await fetch('/add_marker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await res.json();
+
+      if (res.ok) {
+        alert('เพิ่มหมุดสำเร็จ');
+        hidePopupForm();
+        loadMarkers();
+      } else {
+        alert('ผิดพลาด: ' + (result.error || 'ไม่สามารถเพิ่มหมุดได้'));
+      }
+    } catch (err) {
+      alert('ผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      saveBtn.disabled = false;
     }
   };
 
