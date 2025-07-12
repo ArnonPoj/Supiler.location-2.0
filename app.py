@@ -1,13 +1,10 @@
 from flask import Flask, render_template, request, jsonify
 import psycopg2
 import os
-import folium
-from openlocationcode import openlocationcode as olc
 
 app = Flask(__name__)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-print("DATABASE_URL =", DATABASE_URL)  # Debug
 
 def get_conn():
     if not DATABASE_URL:
@@ -23,7 +20,6 @@ def init_db():
             lat DOUBLE PRECISION NOT NULL,
             lon DOUBLE PRECISION NOT NULL,
             title TEXT NOT NULL,
-            olc TEXT,
             address TEXT,
             detail TEXT
         )
@@ -34,123 +30,57 @@ def init_db():
 def get_all_markers():
     conn = get_conn()
     c = conn.cursor()
-    c.execute("SELECT id, lat, lon, title, olc, address, detail FROM markers")
+    c.execute("SELECT id, lat, lon, title, address, detail FROM markers")
     rows = c.fetchall()
     conn.close()
     return rows
 
-def add_marker(lat, lon, title, olc_code=None, address=None, detail=None):
+def add_marker(lat, lon, title, address=None, detail=None):
     conn = get_conn()
     c = conn.cursor()
     c.execute("""
-        INSERT INTO markers (lat, lon, title, olc, address, detail)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """, (lat, lon, title, olc_code, address, detail))
+        INSERT INTO markers (lat, lon, title, address, detail)
+        VALUES (%s, %s, %s, %s, %s)
+    """, (lat, lon, title, address, detail))
     conn.commit()
     conn.close()
 
-def delete_marker(marker_id):
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("DELETE FROM markers WHERE id = %s", (marker_id,))
-    conn.commit()
-    conn.close()
-
-def decode_olc(code, ref_lat=13.7563, ref_lon=100.5018):
-    plus_code = code.split()[0].strip()
-    if not olc.isFull(plus_code):
-        recovered = olc.recoverNearest(plus_code, ref_lat, ref_lon)
-        decoded = olc.decode(recovered)
-    else:
-        decoded = olc.decode(plus_code)
-    return decoded.latitudeCenter, decoded.longitudeCenter
+@app.route('/')
+def index():
+    return render_template('map_leaflet.html')
 
 @app.route('/markers')
 def markers_api():
     markers = get_all_markers()
-    data = []
-    for m in markers:
-        id, lat, lon, title, olc_code, address, detail = m
-        data.append({
-            'id': id,
-            'lat': lat,
-            'lon': lon,
-            'title': title,
-            'olc': olc_code,
-            'address': address,
-            'detail': detail,
-        })
-    return jsonify(data)
-
-@app.route('/')
-def index():
-    markers = get_all_markers()
-    if markers:
-        start_lat, start_lon = markers[0][1], markers[0][2]
-    else:
-        start_lat, start_lon = 13.7563, 100.5018
-
-    m = folium.Map(location=[start_lat, start_lon], zoom_start=12)
-
-    for mkr in markers:
-        id, lat, lon, title, olc_code, address, detail = mkr
-        popup_html = f"""
-        <div style=\"min-width:200px;\">
-            <b>{title}</b><br>
-            <b>OLC:</b> {olc_code or '-'}<br>
-            <b>ที่อยู่:</b> {address or '-'}<br>
-            <b>รายละเอียด:</b> {detail or '-'}<br>
-            <button onclick=\"deleteMarker({id})\" style=\"color:red;\">🗑 ลบหมุด</button>
-        </div>
-        """
-        folium.Marker(
-            location=[lat, lon],
-            popup=folium.Popup(popup_html, max_width=300),
-            tooltip=title
-        ).add_to(m)
-
-    map_html = m._repr_html_()
-    return render_template('map_folium.html', map_html=map_html)
+    return jsonify([
+        {
+            'id': m[0], 'lat': m[1], 'lon': m[2],
+            'title': m[3], 'address': m[4], 'detail': m[5]
+        }
+        for m in markers
+    ])
 
 @app.route('/add_marker', methods=['POST'])
 def add_marker_api():
-    data = request.json
+    data = request.get_json()
     title = data.get('title')
-    olc_code = data.get('olc', '').strip() or None
     address = data.get('address', '').strip() or None
     detail = data.get('detail', '').strip() or None
     lat = data.get('lat')
     lon = data.get('lon')
 
-    if lat is not None and lon is not None:
-        try:
-            lat = float(lat)
-            lon = float(lon)
-        except:
-            return {"error": "พิกัดละติจูเลงจิจูดไม่ถูกต้อง"}, 400
-    elif olc_code:
-        try:
-            lat, lon = decode_olc(olc_code)
-        except Exception as e:
-            return {"error": f"OLC ไม่ถูกต้อง: {str(e)}"}, 400
-    else:
-        return {"error": "ต้องระบุพิกัดหรือ OLC อย่างใดอย่หนึ่ง"}, 400
-
     if not title:
         return {"error": "กรุณากรอกชื่อสถานที่"}, 400
 
-    add_marker(lat, lon, title, olc_code, address, detail)
-    return {"message": "เพิ่มหมุดสำเร็จ"}, 200
-
-@app.route('/delete_marker/<int:marker_id>', methods=['DELETE'])
-def delete_marker_api(marker_id):
     try:
-        delete_marker(marker_id)
-        return jsonify({"message": "ลบหมุดสำเร็จ"}), 200
-    except Exception as e:
-        return jsonify({"error": f"ไม่สามารถลบหมุดได้: {str(e)}"}), 500
+        lat = float(lat)
+        lon = float(lon)
+    except:
+        return {"error": "พิกัดไม่ถูกต้อง"}, 400
+
+    add_marker(lat, lon, title, address, detail)
+    return {"message": "เพิ่มหมุดสำเร็จ"}, 200
 
 if __name__ == '__main__':
     init_db()
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
